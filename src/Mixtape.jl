@@ -40,12 +40,9 @@ struct ExtractingInterpreter <: Core.Compiler.AbstractInterpreter
     msgs::Vector{Tuple{MethodInstance, Int, String}}
 end
 
-ExtractingInterpreter() = ExtractingInterpreter(
-                                                Dict{MethodInstance, Any}(),
+ExtractingInterpreter() = ExtractingInterpreter(Dict{MethodInstance, Any}(),
                                                 NativeInterpreter(),
-                                                Vector{Tuple{MethodInstance, Int, String}}()
-                                               )
-
+                                                Vector{Tuple{MethodInstance, Int, String}}())
 
 InferenceParams(ei::ExtractingInterpreter) = InferenceParams(ei.native_interpreter)
 OptimizationParams(ei::ExtractingInterpreter) = OptimizationParams(ei.native_interpreter)
@@ -65,14 +62,23 @@ Core.Compiler.haskey(a::WorldView{<:Dict}, b) =
 Core.Compiler.haskey(a.cache, b)
 Core.Compiler.setindex!(a::Dict, b, c) = setindex!(a, b, c)
 
-function abstract_call_gf_by_type(interp::ExtractingInterpreter, @nospecialize(f), argtypes::Vector{Any}, @nospecialize(atype), sv::InferenceState, max_methods = InferenceParams(interp).MAX_METHODS)
+function abstract_call_gf_by_type(interp::ExtractingInterpreter, 
+                                  @nospecialize(f), 
+                                  argtypes::Vector{Any}, 
+                                  @nospecialize(atype), 
+                                  sv::InferenceState, 
+                                  max_methods = InferenceParams(interp).MAX_METHODS)
     invoke(abstract_call_gf_by_type, Tuple{AbstractInterpreter, Any, Vector{Any}, Any, InferenceState, Any}, interp, f, argtypes, atype, sv, max_methods)
 end
 
-function abstract_call(interp::ExtractingInterpreter, fargs::Union{Nothing,Vector{Any}}, argtypes::Vector{Any}, vtypes::VarTable, sv::InferenceState, max_methods = InferenceParams(interp).MAX_METHODS)
+function abstract_call(interp::ExtractingInterpreter, 
+                       fargs::Union{Nothing,Vector{Any}}, 
+                       argtypes::Vector{Any}, 
+                       vtypes::VarTable, 
+                       sv::InferenceState, 
+                       max_methods = InferenceParams(interp).MAX_METHODS)
     invoke(abstract_call, Tuple{AbstractInterpreter, Union{Nothing, Vector{Any}}, Vector{Any}, VarTable, InferenceState, Any}, interp, fargs, argtypes, vtypes, sv, max_methods)
 end
-
 
 # Call graph.
 abstract type FunctionGraph; end

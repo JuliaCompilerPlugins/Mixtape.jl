@@ -10,8 +10,16 @@ function foo(x::Float64)
     return q
 end
 
-ei, ssg, frame = analyze(Tuple{typeof(foo), Float64})
-println(abstract_call_gf_by_type(ei, foo, Any[Const(foo), Float64], Tuple{typeof(foo), Float64}, frame))
+function bar(x::Float64)
+    return x
+end
 
+Mixtape.@mixer BasicTable
+
+function overlay(mixer::New, fn::typeof(foo), x::Float64)
+    return x + 10.0
+end
+
+mix(BasicTable(), foo, 5.0)
 
 end # module

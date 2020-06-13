@@ -2,3 +2,6 @@ name = "Mixtape"
 uuid = "d889e6d8-9a0b-4703-8aac-392885f27108"
 authors = ["McCoy R. Becker <mccoybecker@gmail.com>"]
 version = "0.1.0"
+
+[deps]
+ExportAll = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"

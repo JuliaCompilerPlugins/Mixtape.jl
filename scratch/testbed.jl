@@ -16,10 +16,11 @@ end
 
 Mixtape.@mixer BasicTable
 
-function overlay(mixer::New, fn::typeof(foo), x::Float64)
-    return x + 10.0
+function Mixtape.overlay(mixer::BasicTable, fn::typeof(foo), x::Float64)
+    return
 end
 
-mix(BasicTable(), foo, 5.0)
+mxi, ssg = Mixtape.mix(BasicTable(), foo, 5.0)
+println(ssg)
 
 end # module

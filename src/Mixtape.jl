@@ -107,7 +107,6 @@ end
     n_ir = IRTools.renumber(IRTools.varargs!(m, n_ir, 3))
     ud = update!(m.code, n_ir)
     ud.method_for_inference_limit_heuristics = nothing
-    println(ud)
     return ud
 end
 

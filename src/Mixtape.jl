@@ -59,4 +59,7 @@ end
 # Fallback.
 remix!(ctx::MixTable, fn, args...) = fn(args...)
 
+# Convenience.
+(c::MixTable)(fn::Function, args...) = remix!(c, fn, args...)
+
 end # module

@@ -1,4 +1,4 @@
-_Mixtape.jl_ is currently a minimal re-implementation of contextual dispatch using `IRTools.jl`. [tokei](https://github.com/XAMPPRocky/tokei) counts 41 lines of code (not including the magic of [Mike Innes](https://github.com/MikeInnes) and the wonderful [IRTools](https://github.com/MikeInnes/IRTools.jl)). 
+_Mixtape.jl_ is currently a minimal re-implementation of contextual dispatch using `IRTools.jl`. [tokei](https://github.com/XAMPPRocky/tokei) counts 41 lines of code for the core of this system (not including the magic of [Mike Innes](https://github.com/MikeInnes) and the wonderful [IRTools](https://github.com/MikeInnes/IRTools.jl)). 
 
 It can be used for pedagogical purposes, to get a feel for how this particularly quirky part of Julia works.
 
@@ -89,7 +89,7 @@ function remix!(ir)
 end
 ```
 
-This has the effect of bootstrapping this sort of recursive descent into method bodies, transforming the calls, etc until you hit primitives which return directly and don't recursive.
+This has the effect of bootstrapping this sort of recursive descent into method bodies, transforming the calls, etc until you hit primitives which return directly and don't recursive. These two components are all you really need for the base functionality.
 
 The main IR transformation ignores calls from `Base` and `Core` - by ignoring these calls, they are defined as primitives. If you want to `remix!` these calls, you'll have to define the primitives yourself.
 

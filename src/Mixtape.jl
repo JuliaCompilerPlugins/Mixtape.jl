@@ -36,8 +36,8 @@ function pipe_transform!(pr::IRTools.Pipe, hi::Type{Hooks})
     for (v, st) in pr
         ex = st.expr
         if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
-            insert!(pr, v, Expr(:call, GlobalRef(Mixtape, :scrub!), new, ex.args...))
-            insertafter!(pr, v, Expr(:call, GlobalRef(Mixtape, :dub!), new, ex.args...))
+            insert!(pr, v, Expr(:call, GlobalRef(@__MODULE__, :scrub!), new, ex.args...))
+            insertafter!(pr, v, Expr(:call, GlobalRef(@__MODULE__, :dub!), new, ex.args...))
             pr[v] = Expr(:call, GlobalRef(@__MODULE__, :remix!), new, ex.args...)
         end
     end
@@ -47,8 +47,6 @@ function remix_no_args!(ir, hi)
     pr = IRTools.Pipe(ir)
     pipe_transform!(pr, hi)
     ir = IRTools.finish(pr)
-
-    # Re-order arguments.
     blank = argument!(ir)
     return ir
 end
@@ -57,6 +55,8 @@ function remix_args!(ir, hi)
     pr = IRTools.Pipe(ir)
     pipe_transform!(pr, hi)
     ir = IRTools.finish(pr)
+
+    # Re-order.
     ir_args = IRTools.arguments(ir)
     insert!(ir_args, 2, ir_args[end])
     pop!(ir_args)

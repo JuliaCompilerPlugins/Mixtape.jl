@@ -49,6 +49,6 @@ test = p -> begin
     end
 end
 
-@time test(0.2)
+@time test(0.8)
 
 end # module

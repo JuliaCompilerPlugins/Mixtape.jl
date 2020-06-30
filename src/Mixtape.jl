@@ -19,13 +19,30 @@ struct NoPass <: PassIndicator end
 # This will be our "context" type
 abstract type MixTable{T <: HookIndicator, L <: PassIndicator} end
 
+# Base-specific fixes.
+function _apply_iterate_check(ex::Expr)
+    ex.args[1] isa GlobalRef && ex.args[1].name == :_apply_iterate
+end
+function _apply_iterate_fix(ex::Expr, new)
+    #return Expr(:call, GlobalRef(@__MODULE__, :remix!), new, GlobalRef(Core, :_apply_iterate), ex.args[2:end]...)
+    return ex
+end
+function core_check(ex::Expr)
+    ex.args[1] isa GlobalRef && (ex.args[1].mod == Core || parentmodule(ex.args[1].mod) == Core)
+end
+function base_check(ex::Expr)
+    ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || parentmodule(ex.args[1].mod) == Base)
+end
+
 # Recursively wraps function calls with the below generated function call and inserts the context argument.
 function pipe_transform!(pr::IRTools.Pipe, hi::Type{NoHooks})
     new = argument!(pr)
     for (v, st) in pr
         ex = st.expr
-        if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core || ex.args[1].mod == Base.Iterators))
-            if ex.args[1] isa GlobalRef && ex.args[1].name == :rand
+        if ex isa Expr && ex.head == :call
+            if _apply_iterate_check(ex)
+                pr[v] = _apply_iterate_fix(ex, new)
+            elseif ex.args[1] isa GlobalRef && !core_check(ex) && !base_check(ex)
                 ref = GlobalRef(@__MODULE__, :remix!)
                 pr[v] = Expr(:call, ref, new, ex.args...)
             end
@@ -37,10 +54,14 @@ function pipe_transform!(pr::IRTools.Pipe, hi::Type{Hooks})
     new = argument!(pr)
     for (v, st) in pr
         ex = st.expr
-        if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core || ex.args[1].mod == Base.Iterators))
-            insert!(pr, v, Expr(:call, GlobalRef(@__MODULE__, :scrub!), new, ex.args...))
-            insertafter!(pr, v, Expr(:call, GlobalRef(@__MODULE__, :dub!), new, ex.args...))
-            pr[v] = Expr(:call, GlobalRef(@__MODULE__, :remix!), new, ex.args...)
+        if ex isa Expr && ex.head == :call
+            if _apply_iterate_check(ex)
+                pr[v] = _apply_iterate_fix(ex)
+            elseif ex.args[1] isa GlobalRef && !core_check(ex) && !base_check(ex)
+                insert!(pr, v, Expr(:call, GlobalRef(@__MODULE__, :scrub!), new, ex.args...))
+                insertafter!(pr, v, Expr(:call, GlobalRef(@__MODULE__, :dub!), new, ex.args...))
+                pr[v] = Expr(:call, GlobalRef(@__MODULE__, :remix!), new, ex.args...)
+            end
         end
     end
 end

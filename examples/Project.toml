@@ -1,4 +1,5 @@
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+GenerativeHap = "85ceb6d8-9bd0-4a57-b58d-68baa4d66edb"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 Profile = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"

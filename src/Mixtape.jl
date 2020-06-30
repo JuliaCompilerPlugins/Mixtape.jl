@@ -4,24 +4,26 @@ using IRTools
 using IRTools: argument!, insert!, insertafter!
 using IRTools.Inner: argnames!, slots!, update!
 using Core: CodeInfo
-using InteractiveUtils: @code_llvm, @code_lowered, @code_native
 
 # This will be our "context" type
 abstract type MixTable end
 
 # Recursively wraps function calls with the below generated function call and inserts the context argument.
-function remix!(ir, hooks = false)
+function remix!(ir; hooks = false)
     pr = IRTools.Pipe(ir)
+   
+    # Iterate across Pipe, inserting calls to the generated function and inserting the context argument.
     new = argument!(pr)
-    
-
     for (v, st) in pr
         ex = st.expr
         ex isa Expr && ex.head == :call && begin
+
+            # Ignores Base and Core.
             if !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
                 args = copy(ex.args)
-                ex = Expr(:call, GlobalRef(@__MODULE__, :remix!), new, ex.args...)
-                pr[v] = ex
+                pr[v] = Expr(:call, GlobalRef(Mixtape, :remix!), new, ex.args...)
+
+                # Prehook/posthook capabilities.
                 if hooks
                     insert!(pr, v, Expr(:call, :scrub!, new, args...))
                     insertafter!(pr, v, Expr(:call, :dub!, new, args...))
@@ -29,9 +31,11 @@ function remix!(ir, hooks = false)
             end
         end
     end
+
+    # Turn Pipe into IR.
     ir = IRTools.finish(pr)
     
-    # Swap.
+    # Re-order arguments.
     ir_args = IRTools.arguments(ir)
     insert!(ir_args, 2, ir_args[end])
     pop!(ir_args)
@@ -41,9 +45,7 @@ function remix!(ir, hooks = false)
     return ir
 end
 
-_remix(fn, args...) = fn(args...)
-
-@generated function remix!(ctx::MixTable, fn::Function, args...)
+@generated function remix!(ctx::MixTable, fn::Function, args...) 
     T = Tuple{fn, args...}
     m = IRTools.meta(T)
     m isa Nothing && error("Error in remix!: could not derive lowered method body for $T.")
@@ -62,31 +64,7 @@ _remix(fn, args...) = fn(args...)
     return ud
 end
 
-# ---- Test ---- #
-
-function bar(x::Float64)
-    y = x + 10.0
-    return y
-end
-
-function foo(x::Float64, y::Float64)
-    z = x + 20.0
-    q = bar(y) + z
-    return q
-end
-
-mutable struct CountingMix <: MixTable
-    count::Int
-end
-
-function remix!(ctx::CountingMix, fn::typeof(+), args...)
-    ctx.count += 1
-    return fn(args...)
-end
-
-ctx = CountingMix(0)
-x = remix!(ctx, foo, 5.0, 3.0)
-println(ctx.count)
-println(x)
+# Fallback.
+remix!(ctx::MixTable, fn, args...) = fn(args...)
 
 end # module

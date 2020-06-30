@@ -2,25 +2,25 @@ module TestBench
 
 include("../src/Mixtape.jl")
 using .Mixtape
-using Core.Compiler: Const, abstract_call_gf_by_type, abstract_call
 
-function foo(x::Float64)
-    y = x + 10.0
-    q = y * 10.0
-    return q
+function foo(x::Float64, y::Float64)
+    q = x + 20.0
+    l = q + 20.0
+    return l
 end
 
-function bar(x::Float64)
-    return x
+mutable struct CountingMix <: Mixtape.MixTable
+    count::Int
+    CountingMix() = new(0)
 end
 
-Mixtape.@mixer BasicTable
-
-function Mixtape.overlay(mixer::BasicTable, fn::typeof(foo), x::Float64)
-    return
+function Mixtape.remix!(ctx::CountingMix, fn::typeof(+), args...)
+    ctx.count += 1
+    return fn(args...)
 end
 
-mxi, ssg = Mixtape.mix(BasicTable(), foo, 5.0)
-println(ssg)
+ctx = CountingMix()
+x = Mixtape.remix!(ctx, foo, 5.0, 3.0)
+println(ctx.count)
 
-end # module
+end

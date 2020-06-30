@@ -5,10 +5,7 @@ Usage is very simple - you use `remix!` just like you use `overdub`.
 In this library, context objects type inherit from the `MixTable` abstract type.
 
 ```julia
-module TestBench
-
-include("../src/Mixtape.jl")
-using .Mixtape
+using Mixtape
 
 function foo(x::Float64, y::Float64)
     q = x + 20.0
@@ -29,8 +26,6 @@ end
 ctx = CountingMix()
 x = Mixtape.remix!(ctx, foo, 5.0, 3.0)
 println(ctx.count)
-
-end
 ```
 
 ## How it works

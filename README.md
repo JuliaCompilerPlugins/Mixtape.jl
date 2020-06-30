@@ -36,7 +36,7 @@ end
 This library ignores calls from `Base` and `Core`, as can be seen in the main IR transformation:
 
 ```julia
-function remix!(ir; hooks = false)
+function remix!(ir)
     pr = IRTools.Pipe(ir)
    
     # Iterate across Pipe, inserting calls to the generated function and inserting the context argument.
@@ -49,12 +49,6 @@ function remix!(ir; hooks = false)
             if !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
                 args = copy(ex.args)
                 pr[v] = Expr(:call, GlobalRef(Mixtape, :remix!), new, ex.args...)
-
-                # Prehook/posthook capabilities.
-                if hooks
-                    insert!(pr, v, Expr(:call, :scrub!, new, args...))
-                    insertafter!(pr, v, Expr(:call, :dub!, new, args...))
-                end
             end
         end
     end

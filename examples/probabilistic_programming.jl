@@ -3,7 +3,6 @@ module ProbabilisticProgramming
 include("../src/Mixtape.jl")
 using .Mixtape
 using Distributions
-using Profile
 
 abstract type RecordSite end
 
@@ -42,7 +41,6 @@ end
 geo(p::Float64) = rand(:flip, Bernoulli(p)) == 1 ? 0 : 1 + rand(:geo, geo, p)
 tr = Trace()
 tr(geo, 0.8)
-Profile.clear_malloc_data()
 test = p -> begin
     for i in 1:1e6
         tr = Trace()

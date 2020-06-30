@@ -9,32 +9,26 @@ using Core: CodeInfo
 abstract type MixTable end
 
 # Recursively wraps function calls with the below generated function call and inserts the context argument.
-function remix!(ir; hooks = false)
+function remix!(ir)
     pr = IRTools.Pipe(ir)
-   
+
     # Iterate across Pipe, inserting calls to the generated function and inserting the context argument.
     new = argument!(pr)
     for (v, st) in pr
         ex = st.expr
         ex isa Expr && ex.head == :call && begin
-
+            
             # Ignores Base and Core.
             if !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
                 args = copy(ex.args)
                 pr[v] = Expr(:call, GlobalRef(Mixtape, :remix!), new, ex.args...)
-
-                # Prehook/posthook capabilities.
-                if hooks
-                    insert!(pr, v, Expr(:call, :scrub!, new, args...))
-                    insertafter!(pr, v, Expr(:call, :dub!, new, args...))
-                end
             end
         end
     end
 
     # Turn Pipe into IR.
     ir = IRTools.finish(pr)
-    
+
     # Re-order arguments.
     ir_args = IRTools.arguments(ir)
     insert!(ir_args, 2, ir_args[end])
@@ -55,10 +49,8 @@ end
     n_ir = remix!(ir)
 
     # Update meta.
-    original_argnames = m.code.slotnames[2:m.nargs]
     argnames!(m, Symbol("#self#"), :ctx, :fn, :args)
-    n_ir = IRTools.varargs!(m, n_ir, 3)
-    n_ir = IRTools.renumber(n_ir)
+    n_ir = IRTools.renumber(IRTools.varargs!(m, n_ir, 3))
     ud = update!(m.code, n_ir)
     ud.method_for_inference_limit_heuristics = nothing
     return ud

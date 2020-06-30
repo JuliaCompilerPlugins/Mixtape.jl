@@ -1,4 +1,4 @@
-_Mixtape.jl_ is currently a minimal re-implementation of contextual dispatch using `IRTools.jl`.
+_Mixtape.jl_ is currently a minimal re-implementation of contextual dispatch using `IRTools.jl`. `Tokei` counts ~41 LOC.
 
 Usage is very simple - you use `remix!` just like you use `overdub`.
 
@@ -56,7 +56,7 @@ There's a core `generated` function which grabs lowered method reflection inform
 end
 ```
 
-Simultaneously, there's an IR transformation which traverse the IR and inserts calls to the `generated` function:
+This `generated` function returns a `CodeInfo` object which the compiler eats up and assumes is "god given" (the words of @vchuravy :) ). Inside the body of the `generated` function, there's an IR transformation which traverses the IR and inserts calls to the `generated` function itself:
 
 ```julia
 function remix!(ir)
@@ -90,7 +90,7 @@ function remix!(ir)
 end
 ```
 
-This has the effect of bootstrapping this sort of recursive descent into method bodies, transforming the calls, etc.
+This has the effect of bootstrapping this sort of recursive descent into method bodies, transforming the calls, etc until you hit primitives which return directly and don't recursive.
 
 The main IR transformation ignores calls from `Base` and `Core` - by ignoring these calls, they are defined as primitives. If you want to `remix!` these calls, you'll have to define the primitives yourself.
 

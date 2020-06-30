@@ -16,13 +16,8 @@ function remix!(ir)
     new = argument!(pr)
     for (v, st) in pr
         ex = st.expr
-        ex isa Expr && ex.head == :call && begin
-            
-            # Ignores Base and Core.
-            if !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
-                args = copy(ex.args)
-                pr[v] = Expr(:call, GlobalRef(Mixtape, :remix!), new, ex.args...)
-            end
+        if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
+            pr[v] = Expr(:call, GlobalRef(Mixtape, :remix!), new, ex.args...)
         end
     end
 

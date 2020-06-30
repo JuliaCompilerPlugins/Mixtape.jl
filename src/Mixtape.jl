@@ -28,7 +28,7 @@ function remix!(ir, hi::Type{NoHooks})
     for (v, st) in pr
         ex = st.expr
         if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
-            pr[v] = Expr(:call, GlobalRef(Mixtape, :remix!), new, ex.args...)
+            pr[v] = Expr(:call, GlobalRef(@__MODULE__, :remix!), new, ex.args...)
         end
     end
 
@@ -37,11 +37,15 @@ function remix!(ir, hi::Type{NoHooks})
 
     # Re-order arguments.
     ir_args = IRTools.arguments(ir)
-    insert!(ir_args, 2, ir_args[end])
-    pop!(ir_args)
-    blank = argument!(ir)
-    insert!(ir_args, 3, ir_args[end])
-    pop!(ir_args)
+    if length(ir_args) == 2
+        blank = argument!(ir)
+    else
+        insert!(ir_args, 2, ir_args[end])
+        pop!(ir_args)
+        blank = argument!(ir)
+        insert!(ir_args, 3, ir_args[end])
+        pop!(ir_args)
+    end
     return ir
 end
 
@@ -66,11 +70,15 @@ function remix!(ir, hi::Type{Hooks})
 
     # Re-order arguments.
     ir_args = IRTools.arguments(ir)
-    insert!(ir_args, 2, ir_args[end])
-    pop!(ir_args)
-    blank = argument!(ir)
-    insert!(ir_args, 3, ir_args[end])
-    pop!(ir_args)
+    if length(ir_args) == 2
+        blank = argument!(ir)
+    else
+        insert!(ir_args, 2, ir_args[end])
+        pop!(ir_args)
+        blank = argument!(ir)
+        insert!(ir_args, 3, ir_args[end])
+        pop!(ir_args)
+    end
     return ir
 end
 
@@ -89,6 +97,25 @@ macro build_pass(expr)
         $(esc(s_name))
     end
     build
+end
+
+# Core remix! generated function - inserts itself into IR. No args version.
+@generated function remix!(ctx::MixTable{K, L}, fn::Function) where {K <: HookIndicator, L <: PassIndicator}
+    T = Tuple{fn}
+    m = IRTools.meta(T)
+    m isa Nothing && error("Error in remix!: could not derive lowered method body for $T.")
+    ir = IRTools.IR(m)
+
+    # Update IR.
+    #n_ir = custom_pass!(ir, L)
+    n_ir = remix!(ir, K)
+
+    # Update meta.
+    argnames!(m, Symbol("#self#"), :ctx, :fn)
+    n_ir = IRTools.renumber(n_ir)
+    ud = update!(m.code, n_ir)
+    ud.method_for_inference_limit_heuristics = nothing
+    return ud
 end
 
 # Core remix! generated function - inserts itself into IR.
@@ -111,6 +138,24 @@ end
 end
 
 # Not meant to be overloaded.
+@generated function recurse!(ctx::MixTable{K, L}, fn::Function)  where {K <: HookIndicator, L <: PassIndicator}
+    T = Tuple{fn}
+    m = IRTools.meta(T)
+    m isa Nothing && error("Error in remix!: could not derive lowered method body for $T.")
+    ir = IRTools.IR(m)
+
+    # Update IR.
+    #n_ir = custom_pass!(ir, L)
+    n_ir = remix!(ir, K)
+
+    # Update meta.
+    argnames!(m, Symbol("#self#"), :ctx, :fn)
+    n_ir = IRTools.renumber(n_ir)
+    ud = update!(m.code, n_ir)
+    ud.method_for_inference_limit_heuristics = nothing
+    return ud
+end
+
 @generated function recurse!(ctx::MixTable{K, L}, fn::Function, args...)  where {K <: HookIndicator, L <: PassIndicator}
     T = Tuple{fn, args...}
     m = IRTools.meta(T)
@@ -136,5 +181,7 @@ dub!(ctx::MixTable, fn, args...) = nothing
 
 # Convenience. MixTable closures call remix!
 (c::MixTable)(fn::Function, args...) = remix!(c, fn, args...)
+
+export MixTable, Hooks, NoHooks, remix!, recurse!, scrub!, dub!, NoPass
 
 end # module

@@ -1,4 +1,4 @@
-_Mixtape.jl_ is currently a minimal re-implementation of contextual dispatch using `IRTools.jl`. [tokei](https://github.com/XAMPPRocky/tokei) counts 41 lines of code (not including the magic of Mike Innes and the wonderful [IRTools](https://github.com/MikeInnes/IRTools.jl)).
+_Mixtape.jl_ is currently a minimal re-implementation of contextual dispatch using `IRTools.jl`. [tokei](https://github.com/XAMPPRocky/tokei) counts 41 lines of code (not including the magic of [Mike Innes](https://github.com/MikeInnes) and the wonderful [IRTools](https://github.com/MikeInnes/IRTools.jl)).
 
 Usage is very simple - you use `remix!` just like you use `overdub`.
 
@@ -56,7 +56,7 @@ There's a core `generated` function which grabs lowered method reflection inform
 end
 ```
 
-This `generated` function returns a `CodeInfo` object which the compiler eats up and assumes is "god given" (the words of [Valentin](https://github.com/vchuravy) :) ). Inside the body of the `generated` function, there's an IR transformation which traverses the IR and inserts calls to the `generated` function itself:
+This `generated` function returns a `CodeInfo` object which the compiler eats up and assumes is "god given" (the words of [Valentin](https://github.com/vchuravy) 🐝). Inside the body of the `generated` function, there's an IR transformation which traverses the IR and inserts calls to the `generated` function itself:
 
 ```julia
 function remix!(ir)

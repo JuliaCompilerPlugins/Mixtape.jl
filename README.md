@@ -56,7 +56,7 @@ There's a core `generated` function which grabs lowered method reflection inform
 end
 ```
 
-This `generated` function returns a `CodeInfo` object which the compiler eats up and assumes is "god given" (the words of @vchuravy :) ). Inside the body of the `generated` function, there's an IR transformation which traverses the IR and inserts calls to the `generated` function itself:
+This `generated` function returns a `CodeInfo` object which the compiler eats up and assumes is "god given" (the words of [Valentin](https://github.com/vchuravy) :) ). Inside the body of the `generated` function, there's an IR transformation which traverses the IR and inserts calls to the `generated` function itself:
 
 ```julia
 function remix!(ir)

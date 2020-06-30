@@ -24,9 +24,11 @@ function pipe_transform!(pr::IRTools.Pipe, hi::Type{NoHooks})
     new = argument!(pr)
     for (v, st) in pr
         ex = st.expr
-        if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
-            ref = GlobalRef(@__MODULE__, :remix!)
-            pr[v] = Expr(:call, ref, new, ex.args...)
+        if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core || ex.args[1].mod == Base.Iterators))
+            if ex.args[1] isa GlobalRef && ex.args[1].name == :rand
+                ref = GlobalRef(@__MODULE__, :remix!)
+                pr[v] = Expr(:call, ref, new, ex.args...)
+            end
         end
     end
 end
@@ -35,7 +37,7 @@ function pipe_transform!(pr::IRTools.Pipe, hi::Type{Hooks})
     new = argument!(pr)
     for (v, st) in pr
         ex = st.expr
-        if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
+        if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core || ex.args[1].mod == Base.Iterators))
             insert!(pr, v, Expr(:call, GlobalRef(@__MODULE__, :scrub!), new, ex.args...))
             insertafter!(pr, v, Expr(:call, GlobalRef(@__MODULE__, :dub!), new, ex.args...))
             pr[v] = Expr(:call, GlobalRef(@__MODULE__, :remix!), new, ex.args...)
@@ -98,6 +100,7 @@ end
     n_ir = IRTools.renumber(n_ir)
     ud = update!(m.code, n_ir)
     ud.method_for_inference_limit_heuristics = nothing
+    println(ud)
     return ud
 end
 
@@ -116,10 +119,11 @@ end
     n_ir = IRTools.renumber(IRTools.varargs!(m, n_ir, 3))
     ud = update!(m.code, n_ir)
     ud.method_for_inference_limit_heuristics = nothing
+    println(ud)
     return ud
 end
 
-# Not meant to be overloaded.
+# Not meant to be overloaded - no args.
 @generated function recurse!(ctx::MixTable{K, L}, fn::Function)  where {K <: HookIndicator, L <: PassIndicator}
     m = IRTools.meta(Tuple{fn})
     m isa Nothing && error("Error in remix!: could not derive lowered method body for $T.")
@@ -134,9 +138,11 @@ end
     n_ir = IRTools.renumber(n_ir)
     ud = update!(m.code, n_ir)
     ud.method_for_inference_limit_heuristics = nothing
+    println(ud)
     return ud
 end
 
+# Not meant to be overloaded.
 @generated function recurse!(ctx::MixTable{K, L}, fn::Function, args...)  where {K <: HookIndicator, L <: PassIndicator}
     m = IRTools.meta(Tuple{fn, args...})
     m isa Nothing && error("Error in remix!: could not derive lowered method body for $T.")
@@ -151,6 +157,7 @@ end
     n_ir = IRTools.renumber(IRTools.varargs!(m, n_ir, 3))
     ud = update!(m.code, n_ir)
     ud.method_for_inference_limit_heuristics = nothing
+    println(ud)
     return ud
 end
 

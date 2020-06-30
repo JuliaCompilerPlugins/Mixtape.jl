@@ -6,10 +6,12 @@ using Distributions
 using Profile
 
 abstract type RecordSite end
+
 struct ChoiceSite{T} <: RecordSite
     score::Float64
     val::T
 end
+
 struct CallSite{T, J, K} <: RecordSite
     tr::T
     fn::Function
@@ -18,9 +20,9 @@ struct CallSite{T, J, K} <: RecordSite
 end
 
 struct Trace <: MixTable{NoHooks, NoPass}
-    chm::Dict{Symbol, RecordSite}
+    chm::Dict{Union{Symbol, Pair{Symbol, Int}}, RecordSite}
     score::Float64
-    Trace() = new(Dict{Symbol, RecordSite}(), 0.0)
+    Trace() = new(Dict{Union{Symbol, Pair{Symbol, Int}}, RecordSite}(), 0.0)
 end
 
 function Mixtape.remix!(tr::Trace, fn::typeof(rand), addr::Symbol, d::Distribution{T}) where T
@@ -41,14 +43,14 @@ geo(p::Float64) = rand(:flip, Bernoulli(p)) == 1 ? 0 : 1 + rand(:geo, geo, p)
 tr = Trace()
 tr(geo, 0.8)
 Profile.clear_malloc_data()
-test = () -> begin
+test = p -> begin
     for i in 1:1e6
         tr = Trace()
-        ret = tr(geo, 0.5)
-        CallSite(tr, geo, 0.5, ret)
+        ret = tr(geo, p)
+        CallSite(tr, geo, p, ret)
     end
 end
 
-@profile test()
+@time test(0.2)
 
 end # module

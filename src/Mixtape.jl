@@ -20,65 +20,49 @@ struct NoPass <: PassIndicator end
 abstract type MixTable{T <: HookIndicator, L <: PassIndicator} end
 
 # Recursively wraps function calls with the below generated function call and inserts the context argument.
-function remix!(ir, hi::Type{NoHooks})
-    pr = IRTools.Pipe(ir)
-
-    # Iterate across Pipe, inserting calls to the generated function and inserting the context argument.
+function pipe_transform!(pr::IRTools.Pipe, hi::Type{NoHooks})
     new = argument!(pr)
     for (v, st) in pr
         ex = st.expr
         if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
+            ref = GlobalRef(@__MODULE__, :remix!)
+            pr[v] = Expr(:call, ref, new, ex.args...)
+        end
+    end
+end
+
+function pipe_transform!(pr::IRTools.Pipe, hi::Type{Hooks})
+    new = argument!(pr)
+    for (v, st) in pr
+        ex = st.expr
+        if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
+            insert!(pr, v, Expr(:call, GlobalRef(Mixtape, :scrub!), new, ex.args...))
+            insertafter!(pr, v, Expr(:call, GlobalRef(Mixtape, :dub!), new, ex.args...))
             pr[v] = Expr(:call, GlobalRef(@__MODULE__, :remix!), new, ex.args...)
         end
     end
+end
 
-    # Turn Pipe into IR.
+function remix_no_args!(ir, hi)
+    pr = IRTools.Pipe(ir)
+    pipe_transform!(pr, hi)
     ir = IRTools.finish(pr)
 
     # Re-order arguments.
-    ir_args = IRTools.arguments(ir)
-    if length(ir_args) == 2
-        blank = argument!(ir)
-    else
-        insert!(ir_args, 2, ir_args[end])
-        pop!(ir_args)
-        blank = argument!(ir)
-        insert!(ir_args, 3, ir_args[end])
-        pop!(ir_args)
-    end
+    blank = argument!(ir)
     return ir
 end
 
-# Dispatch with hooks.
-function remix!(ir, hi::Type{Hooks})
+function remix_args!(ir, hi)
     pr = IRTools.Pipe(ir)
-
-    # Iterate across Pipe, inserting calls to the generated function and inserting the context argument.
-    new = argument!(pr)
-    for (v, st) in pr
-        ex = st.expr
-        if ex isa Expr && ex.head == :call && !(ex.args[1] isa GlobalRef && (ex.args[1].mod == Base || ex.args[1].mod == Core))
-            args = copy(ex.args)
-            pr[v] = Expr(:call, GlobalRef(Mixtape, :remix!), new, ex.args...)
-            insert!(pr, v, Expr(:call, GlobalRef(Mixtape, :scrub!), new, args...))
-            insertafter!(pr, v, Expr(:call, GlobalRef(Mixtape, :dub!), new, args...))
-        end
-    end
-
-    # Turn Pipe into IR.
+    pipe_transform!(pr, hi)
     ir = IRTools.finish(pr)
-
-    # Re-order arguments.
     ir_args = IRTools.arguments(ir)
-    if length(ir_args) == 2
-        blank = argument!(ir)
-    else
-        insert!(ir_args, 2, ir_args[end])
-        pop!(ir_args)
-        blank = argument!(ir)
-        insert!(ir_args, 3, ir_args[end])
-        pop!(ir_args)
-    end
+    insert!(ir_args, 2, ir_args[end])
+    pop!(ir_args)
+    blank = argument!(ir)
+    insert!(ir_args, 3, ir_args[end])
+    pop!(ir_args)
     return ir
 end
 
@@ -101,14 +85,13 @@ end
 
 # Core remix! generated function - inserts itself into IR. No args version.
 @generated function remix!(ctx::MixTable{K, L}, fn::Function) where {K <: HookIndicator, L <: PassIndicator}
-    T = Tuple{fn}
-    m = IRTools.meta(T)
+    m = IRTools.meta(Tuple{fn})
     m isa Nothing && error("Error in remix!: could not derive lowered method body for $T.")
     ir = IRTools.IR(m)
 
     # Update IR.
     #n_ir = custom_pass!(ir, L)
-    n_ir = remix!(ir, K)
+    n_ir = remix_no_args!(ir, K)
 
     # Update meta.
     argnames!(m, Symbol("#self#"), :ctx, :fn)
@@ -120,14 +103,13 @@ end
 
 # Core remix! generated function - inserts itself into IR.
 @generated function remix!(ctx::MixTable{K, L}, fn::Function, args...) where {K <: HookIndicator, L <: PassIndicator}
-    T = Tuple{fn, args...}
-    m = IRTools.meta(T)
+    m = IRTools.meta(Tuple{fn, args...})
     m isa Nothing && error("Error in remix!: could not derive lowered method body for $T.")
     ir = IRTools.IR(m)
 
     # Update IR.
     #n_ir = custom_pass!(ir, L)
-    n_ir = remix!(ir, K)
+    n_ir = remix_args!(ir, K)
 
     # Update meta.
     argnames!(m, Symbol("#self#"), :ctx, :fn, :args)
@@ -139,14 +121,13 @@ end
 
 # Not meant to be overloaded.
 @generated function recurse!(ctx::MixTable{K, L}, fn::Function)  where {K <: HookIndicator, L <: PassIndicator}
-    T = Tuple{fn}
-    m = IRTools.meta(T)
+    m = IRTools.meta(Tuple{fn})
     m isa Nothing && error("Error in remix!: could not derive lowered method body for $T.")
     ir = IRTools.IR(m)
 
     # Update IR.
     #n_ir = custom_pass!(ir, L)
-    n_ir = remix!(ir, K)
+    n_ir = remix_no_args!(ir, K)
 
     # Update meta.
     argnames!(m, Symbol("#self#"), :ctx, :fn)
@@ -157,14 +138,13 @@ end
 end
 
 @generated function recurse!(ctx::MixTable{K, L}, fn::Function, args...)  where {K <: HookIndicator, L <: PassIndicator}
-    T = Tuple{fn, args...}
-    m = IRTools.meta(T)
+    m = IRTools.meta(Tuple{fn, args...})
     m isa Nothing && error("Error in remix!: could not derive lowered method body for $T.")
     ir = IRTools.IR(m)
 
     # Update IR.
     #n_ir = custom_pass!(ir, L)
-    n_ir = remix!(ir, K)
+    n_ir = remix_args!(ir, K)
 
     # Update meta.
     argnames!(m, Symbol("#self#"), :ctx, :fn, :args)

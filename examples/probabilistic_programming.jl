@@ -3,7 +3,7 @@ module ProbabilisticProgramming
 include("../src/Mixtape.jl")
 using .Mixtape
 using Distributions
-using InteractiveUtils
+using Profile
 
 abstract type RecordSite end
 struct ChoiceSite{T} <: RecordSite
@@ -37,25 +37,18 @@ function Mixtape.remix!(tr::Trace, fn::typeof(rand), addr::Symbol, call::Functio
 end
 
 # Test.
-function bar(q::Float64)
-    return rand(:m, Normal(q, 1.0))
-end
-
-function foo(z::Float64, y::Float64)
-    x = rand(:x, Normal(5.0, 1.0))
-    l = rand(:l, bar, 5.0)
-    return x + l
-end
-
+geo(p::Float64) = rand(:flip, Bernoulli(p)) == 1 ? 0 : 1 + rand(:geo, geo, p)
 tr = Trace()
-tr(foo, 5.0, 3.0)
+tr(geo, 0.8)
+Profile.clear_malloc_data()
 test = () -> begin
     for i in 1:1e6
         tr = Trace()
-        tr(foo, 5.0, 3.0)
+        ret = tr(geo, 0.5)
+        CallSite(tr, geo, 0.5, ret)
     end
 end
 
-@time test()
+@profile test()
 
 end # module

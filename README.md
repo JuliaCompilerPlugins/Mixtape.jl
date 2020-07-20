@@ -1,4 +1,4 @@
-_Mixtape.jl_ is currently a minimal re-implementation of contextual dispatch using `IRTools.jl`. [tokei](https://github.com/XAMPPRocky/tokei) counts 41 lines of code (not including the magic of [Mike Innes](https://github.com/MikeInnes) and the wonderful [IRTools](https://github.com/MikeInnes/IRTools.jl)).
+_Mixtape.jl_ is currently a minimal re-implementation of contextual dispatch using `IRTools.jl`. [tokei](https://github.com/XAMPPRocky/tokei) counts 39 lines of code (not including the magic of [Mike Innes](https://github.com/MikeInnes) and the wonderful [IRTools](https://github.com/MikeInnes/IRTools.jl)).
 
 Usage is very simple - you use `remix!` just like you use `overdub`.
 
@@ -91,4 +91,4 @@ The main IR transformation ignores calls from `Base` and `Core` - by ignoring th
 
 ---
 
-In the future, I'm hoping to modify _Mixtape.jl_ to be a small re-implementation of contextual dispatch using the new `AbstractInterpreter` infrastructure. As this infrastructure becomes available, and we can dispense with recursively calling `generated` functions, performance characteristics of this library should improve.
+This repository is archived - it's meant to be a small example of this interesting mechanism in Julia.

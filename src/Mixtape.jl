@@ -1,5 +1,10 @@
 module Mixtape
 
+# Status: codegen to local OrcJIT instance not quite working yet.
+# Also, codegen caches to the runtime cache (not our managed cache).
+# So it "sort of works" but not in the right way.
+# Also, nested calls aren't quite there - the wrapping works, but it doesn't do overlay like we expect.
+
 using Core: CodeInfo, Const
 using Core.Compiler
 using Core.Compiler: CodeInstance, MethodInstance
@@ -200,10 +205,9 @@ function method_overlay!(interp::MixtapeInterpreter{C}, mi::MethodInstance) wher
     mi.def.source = ci
 end
 
-
 function infer(wvc, mi, interp)
-    method_overlay!(interp, mi)
-    src = Core.Compiler.typeinf_ext_toplevel(interp, mi)
+    method_overlay!(interp, mi) # pre-inference: wrap calls.
+    src = Core.Compiler.typeinf_ext_toplevel(interp, mi) # hooks into inference with out interpreter.
     
     # inference populates the cache, so we don't need to jl_get_method_inferred
     @assert Core.Compiler.haskey(wvc, mi)
@@ -249,6 +253,7 @@ Base.getindex(m::Core.Compiler.MethodLookupResult, idx::Int) = Core.Compiler.get
 ##### optimize
 #####
 
+# This is basically standard - just run normal passes.
 function Core.Compiler.optimize(interp::MixtapeInterpreter,
         opt::OptimizationState, 
         params::OptimizationParams, 

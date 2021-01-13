@@ -3,13 +3,14 @@ module Swap
 using Mixtape
 import Mixtape.overdub
 
-struct Mix <: Context end
+struct SwapAddition <: Context end
 
-foo(x, y) = x + y
-overdub(ctx::Mix, ::typeof(+), a, b) = a * b
-#ci = code_mix(Mix(), foo, 5, 10)
-
-ci, _, _, _ = overdub(Mix(), foo, 5, 10)
+baz(x, y) = x + y
+function overdub(ctx::SwapAddition, ::typeof(+), args...)
+    foldr(*, args)
+end
+ci, _ = overdub(SwapAddition(), baz, 1, 1) # has a weird cache side effect
 display(ci)
+println(baz(3, 3))
 
 end # module

@@ -185,7 +185,24 @@ function cpu_infer(mi, min_world, max_world, ctx)
     return infer(wvc, mi, interp)
 end
 
+function method_overlay!(interp::MixtapeInterpreter{C}, mi::MethodInstance) where C
+    ci = Core.Compiler.retrieve_code_info(mi)
+    new_inst = []
+    for e in ci.code
+        e isa Expr || continue
+        if e.head == :call
+            push!(new_inst, Expr(:call, overdub, C(), e.args...))
+        else
+            push!(new_inst, e)
+        end
+    end
+    copyto!(ci.code, new_inst)
+    mi.def.source = ci
+end
+
+
 function infer(wvc, mi, interp)
+    method_overlay!(interp, mi)
     src = Core.Compiler.typeinf_ext_toplevel(interp, mi)
     
     # inference populates the cache, so we don't need to jl_get_method_inferred
@@ -232,28 +249,13 @@ Base.getindex(m::Core.Compiler.MethodLookupResult, idx::Int) = Core.Compiler.get
 ##### optimize
 #####
 
-function overdub_pass!(ctx, stmts::InstructionStream)
-    new_inst = []
-    for e in stmts.inst
-        e isa Expr || continue
-        if e.head == :call
-            push!(new_inst, Expr(:call, overdub, ctx, e.args...))
-        else
-            push!(new_inst, e)
-        end
-    end
-    copyto!(stmts.inst, new_inst)
-    return stmts
-end
-
-function Core.Compiler.optimize(interp::MixtapeInterpreter{Ctx}, 
+function Core.Compiler.optimize(interp::MixtapeInterpreter,
         opt::OptimizationState, 
         params::OptimizationParams, 
-        @nospecialize(result)) where Ctx
+        @nospecialize(result))
     nargs = Int(opt.nargs) - 1
     ir = Core.Compiler.run_passes(opt.src, nargs, opt)
     ir = compact!(ir)
-    overdub_pass!(Ctx, ir.stmts)
     new = Core.Compiler.finish(opt, params, ir, result)
 end
 

@@ -217,7 +217,7 @@ function infer(wvc, mi, interp)
     if ci !== nothing && ci.inferred === nothing
         ci.inferred = src
     end
-    return src
+    return
 end
 
 #####
@@ -275,7 +275,7 @@ function cpu_compile(method_instance::Core.MethodInstance, world, ctx; debug = f
 
     # populate the cache
     if cpu_cache_lookup(method_instance, world, world) === nothing
-        ci = cpu_infer(method_instance, world, world, ctx)
+        cpu_infer(method_instance, world, world, ctx)
     end
 
     native_code = ccall(:jl_create_native, Ptr{Cvoid},
@@ -308,8 +308,9 @@ function cpu_compile(method_instance::Core.MethodInstance, world, ctx; debug = f
         (Ptr{Cvoid}, UInt32), native_code, llvm_specfunc_idx[]-1)
     @assert llvm_specfunc_ref != C_NULL
     llvm_specfunc = LLVM.Function(llvm_specfunc_ref)
-
-    return ci, llvm_specfunc, llvm_func, llvm_mod
+    wvc = WorldView(get_cache(NativeInterpreter), world, world)
+    ci = Core.Compiler.getindex(wvc, method_instance)
+    return llvm_specfunc, llvm_func, llvm_mod
 end
 
 function method_instance(@nospecialize(f), @nospecialize(tt), world)

@@ -1,3 +1,7 @@
+#####
+##### LLVM optimization pipeline
+#####
+
 function addTargetPasses!(pm, tm)
     add_library_info!(pm, LLVM.triple(tm))
     add_transform_info!(pm, tm)

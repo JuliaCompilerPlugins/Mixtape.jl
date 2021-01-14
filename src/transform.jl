@@ -15,6 +15,7 @@ function cassette_transform(interp, mi, src)
     method = mi.def
     f = static_eval(getfield(method, :module), method.name)
     ci = copy(src)
+    ci = mix_transform!(interp, ci)
     cassette_transform!(mi, ci)
     return ci
 end
@@ -51,27 +52,66 @@ Return `true` if `x === y` or if `x` is an `SSAValue` such that
 See also: [`replace_match!`](@ref), [`insert_statements!`](@ref)
 """, is_ir_element)
 
+#####
+##### Handle apply and _apply_iterate
+#####
+
+function f_push!(arr::Array, t::Tuple{}) end
+f_push!(arr::Array, t::Array) = append!(arr, t)
+f_push!(arr::Array, t::Tuple) = append!(arr, t)
+f_push!(arr, t) = push!(arr, t)
+function flatten(t::Tuple)
+    arr = Any[]
+    for sub in t
+        f_push!(arr, sub)
+    end
+    return arr
+end
+
+function remix(mt::MixtapeIntrinsic, ::typeof(Core._apply_iterate), f, fn, args...)
+    acc = flatten(args)
+    return descend(mt, fn, acc...)
+end
+
+function handle_apply_iterate!(stmt)
+    stmt.args = [GlobalRef(Mixtape, :remix),
+                 Core.SlotNumber(1),
+                 GlobalRef(Core, :_apply_iterate),
+                 GlobalRef(Base, :iterate),
+                 stmt.args[3 : end]...]
+end
+function handle_apply!(stmt) end
+
+#####
+##### Pass
+#####
+
+function check_recurse(enclosing)
+    (enclosing isa Type && enclosing <: MixtapeIntrinsic) && return true
+    return false
+end
+
+@inline mix_transform!(::Type{<:MixtapeIntrinsic}, src) = src
+@inline mix_transform!(interp::MixtapeInterpreter{Intr}, src) where Intr = mix_transform!(Intr, src)
+
 function cassette_transform!(mi, src)
-    # splice `#self#` into kernel intrinsics
+    enclosing = static_eval(getfield(mi.def, :module), mi.def.name)
+    check_recurse(enclosing) || return src
     for (i, x) in enumerate(src.code)
         stmt = Base.Meta.isexpr(x, :(=)) ? x.args[2] : x
         if Base.Meta.isexpr(stmt, :call)
             applycall = is_ir_element(stmt.args[1], GlobalRef(Core, :_apply), src.code) 
             applyitercall = is_ir_element(stmt.args[1], GlobalRef(Core, :_apply_iterate), src.code) 
-            applycall ? fidx = 2 : applyitercall ? fidx = 3 : fidx = 1
-            f = stmt.args[fidx]
-            f = ir_element(f, src.code)
-            insert!(stmt.args, 1, GlobalRef(Mixtape, :remix))
-            insert!(stmt.args, 2, Core.SlotNumber(1))
-            display(stmt)
-            #if f isa GlobalRef
-            #    ff = static_eval(f.mod, f.name)
-            #    if ff !== nothing
-            #        if ff isa MixtapeIntrinsic
-            #            insert!(stmt.args, fidx+1, Core.SlotNumber(1))
-            #        end
-            #    end
-            #end
+            if applycall
+                handle_apply!(stmt)
+            elseif applyitercall
+                handle_apply_iterate!(stmt)
+            else
+                f = stmt.args[1]
+                f = ir_element(f, src.code)
+                insert!(stmt.args, 1, GlobalRef(Mixtape, :remix))
+                insert!(stmt.args, 2, enclosing == Mixtape.remix ? Core.SlotNumber(2) : Core.SlotNumber(1))
+            end
         end
     end
 end

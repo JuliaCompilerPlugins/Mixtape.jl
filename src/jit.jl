@@ -1,3 +1,7 @@
+#####
+##### JIT compilation (to a thunk)
+#####
+
 function resolver(name, ctx)
     name = unsafe_string(name)
     ## Step 0: Should have already resolved it iff it was in the

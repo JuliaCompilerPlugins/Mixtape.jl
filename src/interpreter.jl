@@ -2,8 +2,9 @@
 ##### Interpreter
 #####
 
-struct MixtapeInterpreter{Inner<:AbstractInterpreter} <: AbstractInterpreter
+struct MixtapeInterpreter{Intrinsic, Inner<:AbstractInterpreter} <: AbstractInterpreter
     inner::Inner
+    MixtapeInterpreter{Intrinsic}(interp::Inner) where {Intrinsic, Inner} = new{Intrinsic, Inner}(interp)
 end
 
 get_world_counter(mxi::MixtapeInterpreter) =  get_world_counter(mxi.inner)
@@ -35,8 +36,9 @@ function cpu_cache_lookup(mi, min_world, max_world)
 end
 
 function cpu_infer(mi, min_world, max_world)
+    intrinsic = static_eval(getfield(mi.def, :module), mi.def.name)
     wvc = WorldView(get_cache(NativeInterpreter), min_world, max_world)
-    interp = MixtapeInterpreter(NativeInterpreter(min_world))
+    interp = MixtapeInterpreter{intrinsic}(NativeInterpreter(min_world))
     return infer(wvc, mi, interp)
 end
 
@@ -64,7 +66,6 @@ function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeIn
     src === nothing && return nothing
     validate_code_in_debug_mode(result.linfo, src, "lowered")
     src = cassette_transform(interp, result.linfo, src)
-    display(src)
     validate_code_in_debug_mode(result.linfo, src, "transformed")
     return InferenceState(result, src, cached, interp)
 end

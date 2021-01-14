@@ -63,7 +63,8 @@ function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeIn
     src = retrieve_code_info(result.linfo)
     src === nothing && return nothing
     validate_code_in_debug_mode(result.linfo, src, "lowered")
-    #src = transform(interp, result.linfo, src)
+    src = cassette_transform(interp, result.linfo, src)
+    display(src)
     validate_code_in_debug_mode(result.linfo, src, "transformed")
     return InferenceState(result, src, cached, interp)
 end

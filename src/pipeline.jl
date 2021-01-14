@@ -30,7 +30,7 @@ function addOptimizationPasses!(pm, tm, opt_level, lower_intrinsics, dump_native
 
     alloc_opt!(pm)
     # consider AggressiveInstCombinePass at optlevel > 2
-    
+
     instruction_combining!(pm)
     cfgsimplification!(pm)
     if dump_native

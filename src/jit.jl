@@ -49,11 +49,6 @@ end
 
 const compiled_cache = Dict{UInt, Any}()
 
-function jit(f::F,tt::TT=Tuple{}) where {F, TT<:Type}
-    fspec = FunctionSpec(f, tt, #=kernel=# false, #=name=# nothing)
-    GPUCompiler.cached_compilation(compiled_cache, _jit, _link, fspec)::Entry{F, tt}
-end
-
 function _link(@nospecialize(fspec::FunctionSpec), (llvm_mod, func_name, specfunc_name))
     # Now invoke the JIT
     jitted_mod = compile!(orc[], llvm_mod, @cfunction(resolver, UInt64, (Cstring, Ptr{Cvoid})), orc[])
@@ -88,3 +83,7 @@ function _jit(@nospecialize(fspec::FunctionSpec))
     return (llvm_mod, func_name, specfunc_name)
 end
 
+function jit(f::F,tt::TT=Tuple{}) where {F, TT<:Type}
+    fspec = FunctionSpec(f, tt, #=kernel=# false, #=name=# nothing)
+    GPUCompiler.cached_compilation(compiled_cache, _jit, _link, fspec)::Entry{F, tt}
+end

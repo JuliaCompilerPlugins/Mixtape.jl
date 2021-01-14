@@ -14,10 +14,11 @@ end
 function cassette_transform(interp, mi, src)
     method = mi.def
     f = static_eval(getfield(method, :module), method.name)
-    ci = copy(src)
+    ci = SafeCodeInfo(src, method.sig isa UnionAll ? 1 : length(method.sig.types))
     ci = mix_transform!(interp, ci)
-    cassette_transform!(mi, ci)
-    return ci
+    ci = cassette_transform!(mi, ci)
+    ci = finish(ci)
+    ci
 end
 
 function ir_element(x, code::Vector)
@@ -56,31 +57,24 @@ See also: [`replace_match!`](@ref), [`insert_statements!`](@ref)
 ##### Handle apply and _apply_iterate
 #####
 
-function f_push!(arr::Array, t::Tuple{}) end
-f_push!(arr::Array, t::Array) = append!(arr, t)
-f_push!(arr::Array, t::Tuple) = append!(arr, t)
-f_push!(arr, t) = push!(arr, t)
-function flatten(t::Tuple)
-    arr = Any[]
-    for sub in t
-        f_push!(arr, sub)
-    end
-    return arr
+function handle_apply_iterate!(sci, stmt, v, codeloc)
+    iterf = stmt.args[2]
+    callf = stmt.args[3]
+    callargs = stmt.args[4:end]
+    k = insert_stmt!(sci, v, Expr(:call, 
+                                  GlobalRef(Core, :tuple), 
+                                  Core.SlotNumber(1), 
+                                  callf))
+    l = insert_stmt!(sci, v + 1, Expr(:call, 
+                                      GlobalRef(Core, :_apply_iterate), 
+                                      iterf, 
+                                      GlobalRef(Mixtape, :remix), 
+                                      k,
+                                      callargs...))
+    insert_stmt!(sci, v + 2, Expr(:return, l))
 end
 
-function remix(mt::MixtapeIntrinsic, ::typeof(Core._apply_iterate), f, fn, args...)
-    acc = flatten(args)
-    return descend(mt, fn, acc...)
-end
-
-function handle_apply_iterate!(stmt)
-    stmt.args = [GlobalRef(Mixtape, :remix),
-                 Core.SlotNumber(1),
-                 GlobalRef(Core, :_apply_iterate),
-                 GlobalRef(Base, :iterate),
-                 stmt.args[3 : end]...]
-end
-function handle_apply!(stmt) end
+function handle_apply!(sci, stmt, v, codeloc) end
 
 #####
 ##### Pass
@@ -94,24 +88,41 @@ end
 @inline mix_transform!(::Type{<:MixtapeIntrinsic}, src) = src
 @inline mix_transform!(interp::MixtapeInterpreter{Intr}, src) where Intr = mix_transform!(Intr, src)
 
-function cassette_transform!(mi, src)
-    enclosing = static_eval(getfield(mi.def, :module), mi.def.name)
-    check_recurse(enclosing) || return src
-    for (i, x) in enumerate(src.code)
-        stmt = Base.Meta.isexpr(x, :(=)) ? x.args[2] : x
+function identity_pass!(enclosing, sci, ci)
+    for (v, stmt) in enumerate(ci.code)
+        codeloc = ci.codelocs[v]
+        push_stmt!(sci, stmt, codeloc)
+    end
+end
+
+function wrapping_pass!(enclosing, sci, ci)
+    for (v, stmt) in enumerate(ci.code)
+        codeloc = ci.codelocs[v]
+        stmt = Base.Meta.isexpr(stmt, :(=)) ? stmt.args[2] : stmt
         if Base.Meta.isexpr(stmt, :call)
-            applycall = is_ir_element(stmt.args[1], GlobalRef(Core, :_apply), src.code) 
-            applyitercall = is_ir_element(stmt.args[1], GlobalRef(Core, :_apply_iterate), src.code) 
+            applycall = is_ir_element(stmt.args[1], GlobalRef(Core, :_apply), ci.code) 
+            applyitercall = is_ir_element(stmt.args[1], GlobalRef(Core, :_apply_iterate), ci.code) 
             if applycall
-                handle_apply!(stmt)
+                handle_apply!(sci, stmt, v, codeloc)
             elseif applyitercall
-                handle_apply_iterate!(stmt)
+                handle_apply_iterate!(sci, stmt, v, codeloc)
             else
                 f = stmt.args[1]
-                f = ir_element(f, src.code)
+                f = ir_element(f, ci.code)
                 insert!(stmt.args, 1, GlobalRef(Mixtape, :remix))
                 insert!(stmt.args, 2, enclosing == Mixtape.remix ? Core.SlotNumber(2) : Core.SlotNumber(1))
+                push_stmt!(sci, stmt, codeloc)
             end
         end
     end
+    new = finish(sci)
+    display(new)
+    new
+end
+
+function cassette_transform!(mi, sci)
+    enclosing = static_eval(getfield(mi.def, :module), mi.def.name)
+    check_recurse(enclosing) ? wrapping_pass!(enclosing, sci, sci.src) : identity_pass!(enclosing, sci, sci.src)
+    identity_pass!(enclosing, sci, sci.src)
+    return sci
 end

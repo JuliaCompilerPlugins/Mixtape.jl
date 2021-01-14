@@ -10,6 +10,11 @@ f(x) = begin
     d
 end
 
+# Of course, we can just compile the code directly.
+thunk = Mixtape.jit(f, Tuple{Int})
+v = thunk(5)
+println(v)
+
 mutable struct MixTable <: MixtapeIntrinsic
     fn
     recorded::Int
@@ -32,7 +37,8 @@ function remix(mt::MixTable, ::typeof(+), args...)
     foldr(*, args)
 end
 
-# You can also define your own passes quite easily - specified by the type of your extended intrinsic.
+# You can also define your own passes quite easily - dispatch on type of your extended intrinsic.
+# Note: the passes are global!
 mix_transform!(::Type{MixTable}, src) = (println(src); src)
 
 # Recompiles.

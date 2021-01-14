@@ -26,6 +26,7 @@ import GPUCompiler: FunctionSpec
 include("intrinsics.jl")
 include("codecache.jl")
 include("interpreter.jl")
+include("codeinfo.jl")
 include("transform.jl")
 include("optimize.jl")
 include("codegen.jl")

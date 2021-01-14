@@ -11,15 +11,15 @@ get_world_counter(mxi::MixtapeInterpreter) =  get_world_counter(mxi.inner)
 get_inference_cache(mxi::MixtapeInterpreter) = get_inference_cache(mxi.inner) 
 InferenceParams(mxi::MixtapeInterpreter) = InferenceParams(mxi.inner)
 OptimizationParams(mxi::MixtapeInterpreter) = OptimizationParams(mxi.inner)
-Core.Compiler.may_optimize(ni::MixtapeInterpreter) = true
-Core.Compiler.may_compress(ni::MixtapeInterpreter) = true
-Core.Compiler.may_discard_trees(ni::MixtapeInterpreter) = true
-Core.Compiler.add_remark!(ni::MixtapeInterpreter, sv::InferenceState, msg) = Core.Compiler.add_remark!(ni.inner, sv, msg)
+Core.Compiler.may_optimize(mxi::MixtapeInterpreter) = true
+Core.Compiler.may_compress(mxi::MixtapeInterpreter) = true
+Core.Compiler.may_discard_trees(mxi::MixtapeInterpreter) = true
+Core.Compiler.add_remark!(mxi::MixtapeInterpreter, sv::InferenceState, msg) = Core.Compiler.add_remark!(mxi.inner, sv, msg)
 lock_mi_inference(mxi::MixtapeInterpreter, mi::MethodInstance) = nothing
 unlock_mi_inference(mxi::MixtapeInterpreter, mi::MethodInstance) = nothing
 
 #####
-##### Codegen/interence integration
+##### Codegen/inference integration
 #####
 
 code_cache(mxi::MixtapeInterpreter) = WorldView(get_cache(typeof(mxi.inner)), get_world_counter(mxi))
@@ -38,7 +38,11 @@ end
 function cpu_infer(mi, min_world, max_world)
     intrinsic = static_eval(getfield(mi.def, :module), mi.def.name)
     wvc = WorldView(get_cache(NativeInterpreter), min_world, max_world)
-    interp = MixtapeInterpreter{intrinsic}(NativeInterpreter(min_world))
+    if intrinsic isa Type && intrinsic <: Mixtape.MixtapeIntrinsic
+        interp = MixtapeInterpreter{intrinsic}(NativeInterpreter(min_world))
+    else
+        interp = MixtapeInterpreter{MixtapeIntrinsic}(NativeInterpreter(min_world))
+    end
     return infer(wvc, mi, interp)
 end
 

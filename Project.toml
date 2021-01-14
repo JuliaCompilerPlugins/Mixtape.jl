@@ -1,10 +1,13 @@
 name = "Mixtape"
-uuid = "d889e6d8-9a0b-4703-8aac-392885f27108"
-authors = ["McCoy R. Becker <mccoybecker@gmail.com>"]
+uuid = "17c23775-69b5-4366-8053-0c64bad4914c"
+authors = ["McCoy R. Becker <mccoybecker@gmail.com> and Valentin Churavy <v.churavy@gmail.com>"]
 version = "0.1.0"
 
 [deps]
-ExprTools = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
-IRTools = "7869d1d1-7146-5819-86e3-90919afe41df"
+GPUCompiler = "61eb1bfa-7361-4325-ad38-22787b887f55"
 LLVM = "929cbde3-209d-540e-8aea-75f648917ca0"
-MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
+
+[compat]
+GPUCompiler = "0.9"
+LLVM = "3.0"
+julia = "1.6"

@@ -1,3 +1,3 @@
 # Mixtape.jl
 
-The fidelity has never been greater...
+> A high fidelity solution for all your dynamic compilation needs.

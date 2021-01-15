@@ -116,13 +116,12 @@ function wrapping_pass!(enclosing, sci, ci)
         end
     end
     new = finish(sci)
-    display(new)
     new
 end
 
 function cassette_transform!(mi, sci)
     enclosing = static_eval(getfield(mi.def, :module), mi.def.name)
-    check_recurse(enclosing) ? wrapping_pass!(enclosing, sci, sci.src) : identity_pass!(enclosing, sci, sci.src)
+    #check_recurse(enclosing) ? wrapping_pass!(enclosing, sci, sci.src) : identity_pass!(enclosing, sci, sci.src)
     identity_pass!(enclosing, sci, sci.src)
     return sci
 end

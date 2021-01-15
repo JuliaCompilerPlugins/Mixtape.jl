@@ -42,8 +42,8 @@ end
 mix_transform!(::Type{MixTable}, src) = (println(src); src)
 
 # Recompiles.
-@time thunk = Mixtape.jit(mixtray, Tuple{Int})
-@time v = thunk(5)
-println((v, mixtray.recorded))
+@time thunk = Mixtape.jit(mixtray, Tuple{Float64})
+@time v = thunk(5.0)
+@time v = thunk(5.0)
 
 end # module

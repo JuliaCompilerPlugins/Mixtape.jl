@@ -43,7 +43,7 @@ struct Entry{F, TT}
     func::Ptr{Cvoid}
 end
 
-# Slow ABI
+# Slow ABI - will eventually be fixed.
 function __call(entry::Entry{F, TT}, args::TT) where {F, TT} 
     args = Any[args...]
     ccall(entry.func, Any, (Any, Ptr{Any}, Int32), entry.f, args, length(args))

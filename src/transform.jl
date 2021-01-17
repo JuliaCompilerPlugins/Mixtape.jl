@@ -98,13 +98,14 @@ end
 
 function handle_fallback!(sci, stmt, v, codeloc)
     f = stmt.args[1]
-    f = ir_element(f, sci.src)
+    f = ir_element(f, sci.src.code)
     insert!(stmt.args, 1, GlobalRef(Mixtape, :remix))
-    insert!(stmt.args, 2, enclosing == Mixtape.remix ? Core.SlotNumber(2) : Core.SlotNumber(1))
+    insert!(stmt.args, 2, Core.SlotNumber(1))
     push_stmt!(sci, stmt, codeloc)
 end
 
 function overdub_pass!(enclosing, sci, ci)
+    display(sci.src)
     for (v, stmt) in enumerate(ci.code)
         codeloc = ci.codelocs[v]
         stmt = Base.Meta.isexpr(stmt, :(=)) ? stmt.args[2] : stmt
@@ -113,12 +114,12 @@ function overdub_pass!(enclosing, sci, ci)
         applyitercall = is_ir_element(stmt.args[1], GlobalRef(Core, :_apply_iterate), ci.code) 
         applycall ? handle_apply!(sci, stmt, v, codeloc) : applyitercall ? handle_apply_iterate!(sci, stmt, v, codeloc) : handle_fallback!(sci, stmt, v, codeloc)
     end
+    display(sci.src)
     finish(sci)
 end
 
 function cassette_transform!(mi, sci)
     enclosing = static_eval(getfield(mi.def, :module), mi.def.name)
-    #check_recurse(enclosing) ? overdub_pass!(enclosing, sci, sci.src) : identity_pass!(enclosing, sci, sci.src)
-    identity_pass!(enclosing, sci, sci.src)
+    check_recurse(enclosing) ? overdub_pass!(enclosing, sci, sci.src) : identity_pass!(enclosing, sci, sci.src)
     return sci
 end

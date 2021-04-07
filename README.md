@@ -2,6 +2,11 @@
 
 > Note: Usage of this compiler package requires `Julia > 1.6`.
 
+```julia
+add https://github.com/femtomc/CodeInfoTools.jl
+add https://github.com/femtomc/Mixtape.jl
+```
+
 ## Function
 
 `Mixtape.jl` is a static method overlay tool which operates during Julia type inference. It allows you to (precisely) replace `CodeInfo`, pre-optimize `CodeInfo`, and create other forms of static analysis tools on uninferred `CodeInfo` as part of Julia's native type inference system.

@@ -46,6 +46,8 @@ debug(ctx::MyMix) = true
 fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
 @time fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
 
+fn(5.0)
+@time fn(5.0)
 display(fn(5.0))
 display(SubFoo.f(5.0))
 

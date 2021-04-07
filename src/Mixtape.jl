@@ -1,7 +1,7 @@
 module Mixtape
 
 using MacroTools: isexpr
-using IRTools
+using CodeInfoTools
 using Core.Compiler
 using Core.Compiler: MethodInstance, NativeInterpreter, CodeInfo, CodeInstance, WorldView,
                      OptimizationState, Const, widenconst, MethodResultPure, CallMeta
@@ -244,25 +244,6 @@ function cpu_infer(ctx, mi, min_world, max_world)
     return ret
 end
 
-function update!(ci::CodeInfo, ir::Core.Compiler.IRCode)
-    Core.Compiler.replace_code_newstyle!(ci, ir, length(ir.argtypes) - 1)
-    ci.inferred = false
-    ci.ssavaluetypes = length(ci.code)
-    IRTools.slots!(ci)
-    fill!(ci.slotflags, 0)
-    return ci
-end
-
-function update!(ci::CodeInfo, ir::IRTools.IR)
-    if ir.meta isa IRTools.Inner.Meta
-        ci.method_for_inference_limit_heuristics = ir.meta.method
-        if isdefined(ci, :edges)
-            ci.edges = Core.MethodInstance[ir.meta.instance]
-        end
-    end
-    return update!(ci, Core.Compiler.IRCode(IRTools.slots!(ir)))
-end
-
 function infer(wvc, mi, interp)
     src = Core.Compiler.typeinf_ext_toplevel(interp, mi)
     try
@@ -283,25 +264,6 @@ function infer(wvc, mi, interp)
     return
 end
 
-# Workaround for what appears to be a Base bug
-untvar(t::TypeVar) = t.ub
-untvar(x) = x
-
-function prepare_ir!(ir::IRTools.IR; type=Any)
-    for (v, st) in ir
-        isexpr(st.expr) || continue
-        ir[v] = IRTools.stmt(Expr(st.expr.head, map(resolve, st.expr.args)...); type=type)
-    end
-    return ir
-end
-
-function set_argtypes!(ir::IRTools.IR, as)
-    for (ind, t) in enumerate(as)
-        IRTools.argtypes(ir)[ind] = t
-    end
-    return ir
-end
-
 # Replace usage sited of `retrieve_code_info`, OptimizationState is one such, but in all interesting use-cases
 # it is derived from an InferenceState. There is a third one in `typeinf_ext` in case the module forbids inference.
 function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeInterpreter)
@@ -309,16 +271,10 @@ function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeIn
     try
         fn = resolve(GlobalRef(result.linfo.def.module, result.linfo.def.name))
         as = map(resolve, result.argtypes[2 : end])
-        m = IRTools.Meta(result.linfo.def, 
-                         result.linfo, 
-                         src, 
-                         result.linfo.def.nargs,
-                         result.linfo.sparam_vals)
-        if !=(m, nothing) && check(interp.ctx, result.linfo.def.module, fn, as...)
-            ir = prepare_ir!(IRTools.IR(m))
-            ir = set_argtypes!(ir, result.linfo.specTypes.parameters)
-            ir = transform(interp.ctx, ir)
-            update!(src, ir)
+        if check(interp.ctx, result.linfo.def.module, fn, as...)
+            b = CodeInfoTools.Builder(src, length(result.argtypes[2 : end]))
+            b = transform(interp.ctx, b)
+            src = finish(b)
         end
     catch e
         push!(interp, e)

@@ -30,7 +30,7 @@ import Core.Compiler: optimize
 
 # JIT
 using GPUCompiler: GPUCompiler
-import GPUCompiler: FunctionSpec
+import GPUCompiler: FunctionSpec, AbstractCompilerTarget, AbstractCompilerParams
 
 #####
 ##### Cache
@@ -80,6 +80,12 @@ get_cache(ai::DataType) = CACHE[ai]
 # We have one global JIT and TM
 const orc = Ref{LLVM.OrcJIT}()
 const tm = Ref{LLVM.TargetMachine}()
+
+struct LLVMCompilerTarget <: AbstractCompilerTarget end
+llvm_machine(target::LLVMCompilerTarget) = tm[]
+struct LLVMCompilerParams <: AbstractCompilerParams
+    ctx
+end
 
 function __init__()
     CACHE[NativeInterpreter] = CodeCache(cpu_invalidate)
@@ -590,8 +596,8 @@ end
 ##### JIT
 #####
 
-using GPUCompiler: GPUCompiler
-import GPUCompiler: FunctionSpec
+using GPUCompiler: GPUCompiler, CompilerJob
+import GPUCompiler: FunctionSpec, AbstractCompilerTarget, AbstractCompilerParams
 
 struct Entry{F,TT}
     f::F
@@ -609,43 +615,32 @@ end
 
 const compiled_cache = Dict{UInt,Any}()
 
-function jit(ctx, f::F, tt::TT=Tuple{}) where {F,TT<:Type}
+function jit(ctx::CompilationContext, f::F, tt::TT=Tuple{}) where {F,TT<:Type}
     fspec = FunctionSpec(f, tt, false, nothing) #=name=#
-    return GPUCompiler.cached_compilation(compiled_cache, fspec -> _jit(ctx, fspec), _link,
-                                          fspec)::Entry{F,tt}
+    job = CompilerJob(LLVMCompilerTarget(), fspec, LLVMCompilerParams(ctx))
+    return GPUCompiler.cached_compilation(compiled_cache, job, _jit, _link)::Entry{F,tt}
 end
 
-function _link(@nospecialize(fspec::FunctionSpec), (llvm_mod, func_name, specfunc_name))
-    # Now invoke the JIT
+function _link(job::CompilerJob, (llvm_mod, func_name, specfunc_name))
+    fspec = job.source
     jitted_mod = compile!(orc[], llvm_mod)
-
     specfunc_addr = addressin(orc[], jitted_mod, specfunc_name)
     specfunc_ptr = pointer(specfunc_addr)
-
     func_addr = addressin(orc[], jitted_mod, func_name)
     func_ptr = pointer(func_addr)
-
     if specfunc_ptr === C_NULL || func_ptr === C_NULL
         @error "Compilation error" fspec specfunc_ptr func_ptr
     end
-
     return Entry{typeof(fspec.f),fspec.tt}(fspec.f, specfunc_ptr, func_ptr)
 end
 
-# actual compilation
-function _jit(ctx, @nospecialize(fspec::FunctionSpec))
-    llvm_specfunc, llvm_func, llvm_mod = codegen(ctx, fspec.f, fspec.tt)
-
+function _jit(job::CompilerJob)
+    llvm_specfunc, llvm_func, llvm_mod = codegen(job.params.ctx, job.source.f, job.source.tt)
     specfunc_name = LLVM.name(llvm_specfunc)
     func_name = LLVM.name(llvm_func)
-
-    # set linkage to extern visible
-    # otherwise `addressin` won't find them
     linkage!(llvm_func, LLVM.API.LLVMExternalLinkage)
     linkage!(llvm_specfunc, LLVM.API.LLVMExternalLinkage)
-
     run_pipeline!(llvm_mod)
-
     return (llvm_mod, func_name, specfunc_name)
 end
 

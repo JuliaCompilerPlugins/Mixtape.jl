@@ -5,7 +5,7 @@ import Mixtape: CompilationContext, transform, allow_transform, show_after_infer
 using MacroTools
 
 foo(x) = x^5
-bar(x) = x^6
+bar(x) = x^10
 apply(f, x1, x2::Val{T}) where T = f(x1, T)
 
 function f(x)
@@ -39,8 +39,8 @@ function transform(::MyMix, b)
 end
 
 
-fn = Mixtape.jit(MyMix(), f, Tuple{Int64})
-display(fn(2))
-display(fn(6))
+fn = Mixtape.jit(MyMix(), f, Tuple{Float64})
+display(fn(2.0))
+display(fn(6.0))
 
 end # module

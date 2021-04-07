@@ -3,9 +3,6 @@ module How2Mix
 # Unassuming code in an unassuming module...
 module SubFoo
 
-λ() = 10 + 20
-semantic_stub(args...) = nothing
-
 function h(x)
     x = rand()
     y = rand()
@@ -29,17 +26,17 @@ using IRTools
 struct MyMix <: CompilationContext end
 
 function transform(::MyMix, result, ir)
-    display(result.argtypes)
     for (v, st) in ir
         st.expr isa Expr || continue
         st.expr.head == :call || continue
-        st.expr.args[1] == Base.:(+) || continue
-        ir[v] = Expr(:call, Base.:(*), st.expr.args[2 : end]...)
+        st.expr.args[1] == Base.rand || continue
+        ir[v] = 5
     end
     return ir
 end
 
 # MyMix will only transform functions which you explicitly allow.
+#allow_transform(ctx::MyMix, fn::typeof(SubFoo.h), a...) = true
 allow_transform(ctx::MyMix, m::Module) = m == SubFoo
 show_after_inference(ctx::MyMix) = false
 show_after_optimization(ctx::MyMix) = false
@@ -47,8 +44,8 @@ debug(ctx::MyMix) = true
 
 fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
 @time fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
-display(fn(5.0))
 
+display(fn(5.0))
 display(SubFoo.f(5.0))
 
 end # module

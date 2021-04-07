@@ -11,6 +11,7 @@ using LLVM.Interop
 
 resolve(x) = x
 resolve(gr::GlobalRef) = getproperty(gr.mod, gr.name)
+resolve(c::Core.Const) = c.val
 
 # Cache
 using Core.Compiler: WorldView
@@ -166,16 +167,15 @@ end
 
 abstract type CompilationContext end
 struct Fallback <: CompilationContext end
-allow_transform(f::CompilationContext, fn::Function) = false
-allow_transform(f::CompilationContext, m::Module) = false
+allow_transform(f::C, args...) where C <: CompilationContext = false
 show_after_inference(f::CompilationContext) = false
 show_after_optimization(f::CompilationContext) = false
 debug(f::CompilationContext) = false
-transform(ctx::CompilationContext, result, ir) = return ir
-function check(ctx::CompilationContext, m::Module, fn::Function)
-    return allow_transform(ctx, m) || allow_transform(ctx, fn)
+transform(ctx::CompilationContext, result, ir) = ir
+
+function check(ctx::CompilationContext, mod::Module, fn, args...)
+    allow_transform(ctx, mod) || allow_transform(ctx, fn, args...)
 end
-check(ctx::CompilationContext, m, fn) = false
 
 export CompilationContext, transform, allow_transform, show_after_inference,
        show_after_optimization, debug
@@ -284,7 +284,8 @@ function infer(wvc, mi, interp)
     src = Core.Compiler.typeinf_ext_toplevel(interp, mi)
     try
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
-        if check(interp.ctx, mi.def.module, fn) && show_after_inference(interp.ctx)
+        as = mi.specTypes.parameters[2 : end]
+        if check(interp.ctx, mi.def.module, fn, as...) && show_after_inference(interp.ctx)
             println("(Inferred) $fn in $(mi.def.module)")
             display(src)
         end
@@ -332,8 +333,13 @@ function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeIn
     src = retrieve_code_info(result.linfo)
     try
         fn = resolve(GlobalRef(result.linfo.def.module, result.linfo.def.name))
-        m = meta(result.linfo.def.sig)
-        if !=(m, nothing) && check(interp.ctx, result.linfo.def.module, fn)
+        as = map(resolve, result.argtypes[2 : end])
+        m = IRTools.Meta(result.linfo.def, 
+                         result.linfo, 
+                         src, 
+                         result.linfo.def.nargs,
+                         result.linfo.sparam_vals)
+        if !=(m, nothing) && check(interp.ctx, result.linfo.def.module, fn, as...)
             ir = prepare_ir!(IRTools.IR(m))
             ir = transform(interp.ctx, result, ir)
             update!(src, ir)

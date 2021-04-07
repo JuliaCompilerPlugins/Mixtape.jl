@@ -161,11 +161,14 @@ end
 
 abstract type CompilationContext end
 struct Fallback <: CompilationContext end
-allow_transform(f::CompilationContext, fn) = false
+allow_transform(f::CompilationContext, fn::Function) = false
+allow_transform(f::CompilationContext, m::Module) = false
 show_after_inference(f::CompilationContext) = false
 show_after_optimization(f::CompilationContext) = false
 debug(f::CompilationContext) = false
 transform(ctx::CompilationContext, ir) = return ir
+check(ctx::CompilationContext, m::Module, fn::Function) = allow_transform(ctx, m) || allow_transform(ctx, fn)
+check(ctx::CompilationContext, m, fn) = false
 
 export CompilationContext, transform, allow_transform, show_after_inference, show_after_optimization, debug
 
@@ -257,7 +260,7 @@ function infer(wvc, mi, interp)
     src = Core.Compiler.typeinf_ext_toplevel(interp, mi)
     try
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
-            if allow_transform(interp.ctx, fn) && show_after_inference(interp.ctx)
+            if check(interp.ctx, mi.def.module, fn) && show_after_inference(interp.ctx)
                 println("(Inferred) $fn in $(mi.def.module)")
                     display(src)
                 end
@@ -305,7 +308,7 @@ function infer(wvc, mi, interp)
             try
                 fn = resolve(GlobalRef(result.linfo.def.module, result.linfo.def.name))
                     m = meta(result.linfo.def.sig)
-                    if !=(m, nothing) && allow_transform(interp.ctx, fn)
+                    if !=(m, nothing) && check(interp.ctx, result.linfo.def.module, fn)
                         ir = prepare_ir!(IRTools.IR(m))
                         ir = transform(interp.ctx, ir)
                         update!(src, ir)

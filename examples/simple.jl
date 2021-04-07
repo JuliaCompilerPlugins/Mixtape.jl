@@ -3,11 +3,12 @@ module How2Mix
 # Unassuming code in an unassuming module...
 module SubFoo
 
+λ() = 10 + 20
 function semantic_stub(args...)
     println("I'm having so much fun!")
     println("WHAT!")
     x = 20 + 30
-    return foldr(+, args) + x
+    return foldr(+, args) + x + λ()
 end
 
 function h(x)
@@ -42,8 +43,7 @@ function transform(::MyMix, ir)
 end
 
 # MyMix will only transform functions which you explicitly allow.
-allow_transform(ctx::MyMix, f::typeof(SubFoo.f)) = true
-allow_transform(ctx::MyMix, f::typeof(SubFoo.h)) = true
+allow_transform(ctx::MyMix, m::Module) = m == SubFoo
 show_after_inference(ctx::MyMix) = false
 show_after_optimization(ctx::MyMix) = false
 debug(ctx::MyMix) = true

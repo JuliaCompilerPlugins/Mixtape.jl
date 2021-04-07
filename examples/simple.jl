@@ -3,52 +3,61 @@ module How2Mix
 # Unassuming code in an unassuming module...
 module SubFoo
 
-function h(x)
-    x = rand()
-    y = rand()
-    return x + y
+function rosenbrock(x)
+    a = 1.0
+    b = 100.0
+    result = 0.0
+    for i in 1:length(x)-1
+        result += (a - x[i])^2 + b*(x[i+1] - x[i]^2)^2
+    end
+    return result
 end
 
-function f(x)
-    z = rand()
-    return h(x)
+function f()
+    x = rand()
+    y = rand()
+    return rosenbrock([x, y])
 end
+
+g(f) = f()
 
 end
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow_transform, show_after_inference,
-                show_after_optimization, debug
-
-using IRTools
+import Mixtape: CompilationContext, transform, allow_transform, show_after_inference, show_after_optimization, debug
+using MacroTools
 
 # 101: How2Mix
 struct MyMix <: CompilationContext end
 
-function transform(::MyMix, ir)
-    for (v, st) in ir
-        st.expr isa Expr || continue
-        st.expr.head == :call || continue
-        st.expr.args[1] == Base.rand || continue
-        ir[v] = 5
+# A few little utility functions for working with Expr instances.
+swap(e) = e
+function swap(e::Expr)
+    new = MacroTools.postwalk(e) do s
+        isexpr(s, :call) || return s
+        s.args[1] == Base.rand || return s
+        return 5
     end
-    display(ir)
-    return ir
+    return new
+end
+
+function transform(::MyMix, b)
+    for (v, st) in b
+        replace!(b, v, swap(st))
+    end
+    display(b)
+    return b
 end
 
 # MyMix will only transform functions which you explicitly allow.
-#allow_transform(ctx::MyMix, fn::typeof(SubFoo.h), a...) = true
 allow_transform(ctx::MyMix, m::Module) = m == SubFoo
 show_after_inference(ctx::MyMix) = false
 show_after_optimization(ctx::MyMix) = false
 debug(ctx::MyMix) = true
 
-fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
-@time fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
+fn = Mixtape.jit(MyMix(), SubFoo.g, Tuple{typeof(SubFoo.f)})
+@time fn = Mixtape.jit(MyMix(), SubFoo.g, Tuple{typeof(SubFoo.f)})
 
-fn(5.0)
-@time fn(5.0)
-display(fn(5.0))
-display(SubFoo.f(5.0))
+@assert(fn(SubFoo.f) == SubFoo.rosenbrock([5, 5]))
 
 end # module

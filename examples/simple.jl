@@ -1,35 +1,15 @@
-module Simple
+module How2Mix
 
-using Mixtape
-import Mixtape: CompilationContext, process, allowed, debug
-using IRTools
-
-struct MyCtx <: CompilationContext end
+# Unassuming code in an unassuming module...
+module SubFoo
 
 function semantic_stub(args...)
     println("I'm having so much fun!")
-    return foldr(+, args)
+    println("WHAT!")
+    x = 20 + 30
+    return foldr(+, args) + x
 end
 
-function process(::MyCtx, ir)
-    locations = []
-    for (v, st) in ir
-        st.expr isa Expr || continue
-        st.expr.head == :call || continue
-        if st.expr.args[1] == semantic_stub
-            push!(locations, v)
-        end
-    end
-    for v in locations
-        ir = IRTools.inline(ir, v, @code_ir(semantic_stub(5)))
-    end
-    display(ir)
-    return ir
-end
-
-module SubFoo
-
-using ..Simple: semantic_stub
 function h(x)
     return x * 2 + semantic_stub(x)
 end
@@ -39,15 +19,37 @@ function f(x)
     return h(d)
 end
 
-end 
+end
 
-# MyCtx will only process functions which you explicitly allow.
-allowed(ctx::MyCtx, f::typeof(SubFoo.f)) = true
-allowed(ctx::MyCtx, f::typeof(SubFoo.h)) = true
-debug(ctx::MyCtx) = true
+using Mixtape
+import Mixtape: CompilationContext, transform, allow_transform, show_after_inference, show_after_optimization, debug
 
-fn = Mixtape.jit(MyCtx(), SubFoo.f, Tuple{Float64})
-@time fn = Mixtape.jit(MyCtx(), SubFoo.f, Tuple{Float64})
+using IRTools
+
+# 101: How2Mix
+struct MyMix <: CompilationContext end
+
+function transform(::MyMix, ir)
+    locations = []
+    for (v, st) in ir
+        st.expr isa Expr || continue
+        st.expr.head == :call || continue
+        st.expr.args[1] == Base.:(+) || continue
+        ir[v] = Expr(:call, GlobalRef(Base, :(*)), st.expr.args[2 : end]...)
+    end
+    display(ir)
+    return ir
+end
+
+# MyMix will only transform functions which you explicitly allow.
+allow_transform(ctx::MyMix, f::typeof(SubFoo.f)) = true
+allow_transform(ctx::MyMix, f::typeof(SubFoo.h)) = true
+show_after_inference(ctx::MyMix) = false
+show_after_optimization(ctx::MyMix) = false
+debug(ctx::MyMix) = true
+
+fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
+@time fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
 display(fn(5.0))
 
 end # module

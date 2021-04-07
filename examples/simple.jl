@@ -4,41 +4,38 @@ module How2Mix
 module SubFoo
 
 λ() = 10 + 20
-function semantic_stub(args...)
-    println("I'm having so much fun!")
-    println("WHAT!")
-    x = 20 + 30
-    return foldr(+, args) + x + λ()
-end
+semantic_stub(args...) = nothing
 
 function h(x)
-    return x * 2 + semantic_stub(x)
+    x = rand()
+    y = rand()
+    return x + y
 end
 
-function f(x) 
-    d = x + 50
-    return h(d)
+function f(x)
+    z = rand()
+    return h(x)
 end
 
 end
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow_transform, show_after_inference, show_after_optimization, debug
+import Mixtape: CompilationContext, transform, allow_transform, show_after_inference,
+                show_after_optimization, debug
 
 using IRTools
 
 # 101: How2Mix
 struct MyMix <: CompilationContext end
 
-function transform(::MyMix, ir)
-    locations = []
+function transform(::MyMix, result, ir)
+    display(result.argtypes)
     for (v, st) in ir
         st.expr isa Expr || continue
         st.expr.head == :call || continue
         st.expr.args[1] == Base.:(+) || continue
-        ir[v] = Expr(:call, GlobalRef(Base, :(*)), st.expr.args[2 : end]...)
+        ir[v] = Expr(:call, Base.:(*), st.expr.args[2 : end]...)
     end
-    display(ir)
     return ir
 end
 
@@ -51,5 +48,7 @@ debug(ctx::MyMix) = true
 fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
 @time fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
 display(fn(5.0))
+
+display(SubFoo.f(5.0))
 
 end # module

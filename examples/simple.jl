@@ -32,6 +32,7 @@ function transform(::MyMix, ir)
         st.expr.args[1] == Base.rand || continue
         ir[v] = 5
     end
+    display(ir)
     return ir
 end
 

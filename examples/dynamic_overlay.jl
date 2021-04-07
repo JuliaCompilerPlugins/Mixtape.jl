@@ -41,5 +41,6 @@ end
 
 fn = Mixtape.jit(MyMix(), f, Tuple{Int64})
 display(fn(2))
+display(fn(6))
 
 end # module

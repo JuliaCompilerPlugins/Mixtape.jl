@@ -171,7 +171,7 @@ allow_transform(f::C, args...) where C <: CompilationContext = false
 show_after_inference(f::CompilationContext) = false
 show_after_optimization(f::CompilationContext) = false
 debug(f::CompilationContext) = false
-transform(ctx::CompilationContext, result, ir) = ir
+transform(ctx::CompilationContext, ir) = ir
 
 function check(ctx::CompilationContext, mod::Module, fn, args...)
     allow_transform(ctx, mod) || allow_transform(ctx, fn, args...)
@@ -238,21 +238,6 @@ function cpu_infer(ctx, mi, min_world, max_world)
     return ret
 end
 
-function uncompressed_ir(m::Method)
-    return isdefined(m, :source) ? _uncompressed_ir(m, m.source) :
-           isdefined(m, :generator) ?
-           error("Method is @generated; try `code_lowered` instead.") :
-           error("Code for this Method is not available.")
-end
-_uncompressed_ir(m::Method, s::CodeInfo) = copy(s)
-function _uncompressed_ir(m::Method, s::Array{UInt8,1})
-    return ccall(:jl_uncompress_ir, Any, (Any, Ptr{Cvoid}, Any), m, C_NULL, s)::CodeInfo
-end
-function _uncompressed_ir(ci::Core.CodeInstance, s::Array{UInt8,1})
-    return ccall(:jl_uncompress_ir, Any, (Any, Any, Any), ci.def.def::Method, ci,
-                 s)::CodeInfo
-end
-
 function update!(ci::CodeInfo, ir::Core.Compiler.IRCode)
     Core.Compiler.replace_code_newstyle!(ci, ir, length(ir.argtypes) - 1)
     ci.inferred = false
@@ -270,14 +255,6 @@ function update!(ci::CodeInfo, ir::IRTools.IR)
         end
     end
     return update!(ci, Core.Compiler.IRCode(IRTools.slots!(ir)))
-end
-
-function prepare_ir!(ir::IRTools.IR; type=Any)
-    for (v, st) in ir
-        isexpr(st.expr) || continue
-        ir[v] = IRTools.stmt(Expr(st.expr.head, map(resolve, st.expr.args)...); type=type)
-    end
-    return ir
 end
 
 function infer(wvc, mi, interp)
@@ -304,27 +281,19 @@ end
 untvar(t::TypeVar) = t.ub
 untvar(x) = x
 
-function meta(T; types=T, world=Base.get_world_counter())
-    T isa UnionAll && return nothing
-    F = T.parameters[1]
-    F == typeof(invoke) && return invoke_meta(T; world=world)
-    F isa DataType &&
-        (F.name.module === Core.Compiler || F <: Core.Builtin || F <: Core.Builtin) &&
-        return nothing
-    _methods = Base._methods_by_ftype(T, -1, world)
-    length(_methods) == 0 && return nothing
-    type_signature, sps, method = last(_methods)
-    sps = Core.svec(map(untvar, sps)...)
-    @static if VERSION >= v"1.2-"
-        mi = Core.Compiler.specialize_method(method, types, sps)
-        ci = Base.isgenerated(mi) ? Core.Compiler.get_staged(mi) :
-             Base.uncompressed_ast(method)
-    else
-        mi = Core.Compiler.code_for_method(method, types, sps, world, false)
-        ci = Base.isgenerated(mi) ? Core.Compiler.get_staged(mi) : Base.uncompressed_ast(mi)
+function prepare_ir!(ir::IRTools.IR; type=Any)
+    for (v, st) in ir
+        isexpr(st.expr) || continue
+        ir[v] = IRTools.stmt(Expr(st.expr.head, map(resolve, st.expr.args)...); type=type)
     end
-    Base.Meta.partially_inline!(ci.code, [], method.sig, Any[sps...], 0, 0, :propagate)
-    return IRTools.Meta(method, mi, ci, method.nargs, sps)
+    return ir
+end
+
+function set_argtypes!(ir::IRTools.IR, as)
+    for (ind, t) in enumerate(as)
+        IRTools.argtypes(ir)[ind] = t
+    end
+    return ir
 end
 
 # Replace usage sited of `retrieve_code_info`, OptimizationState is one such, but in all interesting use-cases
@@ -341,7 +310,8 @@ function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeIn
                          result.linfo.sparam_vals)
         if !=(m, nothing) && check(interp.ctx, result.linfo.def.module, fn, as...)
             ir = prepare_ir!(IRTools.IR(m))
-            ir = transform(interp.ctx, result, ir)
+            ir = set_argtypes!(ir, result.linfo.specTypes.parameters)
+            ir = transform(interp.ctx, ir)
             update!(src, ir)
         end
     catch e

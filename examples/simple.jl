@@ -25,7 +25,7 @@ using IRTools
 # 101: How2Mix
 struct MyMix <: CompilationContext end
 
-function transform(::MyMix, result, ir)
+function transform(::MyMix, ir)
     for (v, st) in ir
         st.expr isa Expr || continue
         st.expr.head == :call || continue

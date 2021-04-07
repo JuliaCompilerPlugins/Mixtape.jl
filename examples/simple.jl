@@ -1,49 +1,53 @@
 module Simple
 
 using Mixtape
-import Mixtape: MixtapeIntrinsic, remix, mix_transform!
+import Mixtape: CompilationContext, process, allowed, debug
+using IRTools
 
-# Some innocent unaware code...
-f(x) = begin
-    d = Dict()
-    d[:k] = x + 10
-    d
+struct MyCtx <: CompilationContext end
+
+function semantic_stub(args...)
+    println("I'm having so much fun!")
+    return foldr(+, args)
 end
 
-# Of course, we can just compile the code directly.
-thunk = Mixtape.jit(f, Tuple{Int})
-v = thunk(5)
-println(v)
-
-mutable struct MixTable <: MixtapeIntrinsic
-    fn
-    recorded::Int
-end
-(mt::MixTable)(args...) = mt.fn(args...)
-
-# Mixtape automatically enables the fallback of *no interception*.
-mixtray = MixTable(f, 0)
-thunk = Mixtape.jit(mixtray, Tuple{Int})
-v = thunk(5)
-println(v)
-
-# You must explicitly overload.
-function remix(mt::MixTable, ::typeof(Base.getproperty), s, f)
-    mt.recorded += 5
-    Base.getproperty(s, f)
+function process(::MyCtx, ir)
+    locations = []
+    for (v, st) in ir
+        st.expr isa Expr || continue
+        st.expr.head == :call || continue
+        if st.expr.args[1] == semantic_stub
+            push!(locations, v)
+        end
+    end
+    for v in locations
+        ir = IRTools.inline(ir, v, @code_ir(semantic_stub(5)))
+    end
+    display(ir)
+    return ir
 end
 
-function remix(mt::MixTable, ::typeof(+), args...)
-    foldr(*, args)
+module SubFoo
+
+using ..Simple: semantic_stub
+function h(x)
+    return x * 2 + semantic_stub(x)
 end
 
-# You can also define your own passes quite easily - dispatch on type of your extended intrinsic.
-# Note: the passes are global!
-mix_transform!(::Type{MixTable}, src) = (println(src); src)
+function f(x) 
+    d = x + 50
+    return h(d)
+end
 
-# Recompiles.
-@time thunk = Mixtape.jit(mixtray, Tuple{Float64})
-@time v = thunk(5.0)
-@time v = thunk(5.0)
+end 
+
+# MyCtx will only process functions which you explicitly allow.
+allowed(ctx::MyCtx, f::typeof(SubFoo.f)) = true
+allowed(ctx::MyCtx, f::typeof(SubFoo.h)) = true
+debug(ctx::MyCtx) = true
+
+fn = Mixtape.jit(MyCtx(), SubFoo.f, Tuple{Float64})
+@time fn = Mixtape.jit(MyCtx(), SubFoo.f, Tuple{Float64})
+display(fn(5.0))
 
 end # module

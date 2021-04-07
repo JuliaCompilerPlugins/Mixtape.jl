@@ -107,7 +107,7 @@ We get to see our transformed `IRTools.IR` as part of the call to `transform`.
 
 ## Package contribution
 
-1. Completely static -- does not rely on recursive pollution of the call stack.
+1. Completely static -- does not rely on recursive pollution of the call stack (alla [the overdub issue](https://julia.mit.edu/Cassette.jl/stable/overdub.html)).
 2. Pre-type inference -- all semantic-intruding changes happen before type inference runs on the lowered method body.
 3. `Mixtape.jl` manages its own code cache -- doesn't interact with the native runtime system (see above).
 

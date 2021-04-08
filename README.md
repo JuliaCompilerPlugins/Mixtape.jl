@@ -101,7 +101,29 @@ fn = Mixtape.jit(MyMix(), SubFoo.f, Tuple{Float64})
 @assert(SubFoo.f() != 15)
 ```
 
-We get to see our transformed `CodeInfo` as part of the call to `transform`.
+We get to see the transformation on `CodeInfo` as part of the call to `transform`.
+
+Before:
+
+```
+CodeInfo(
+    @ /Users/mccoybecker/dev/Mixtape.jl/examples/simple.jl:10 within `f'
+1 ─      x = (rand)()
+│        y = (rand)()
+│   %3 = x
+│   %4 = y
+│   %5 = (Main.How2Mix.SubFoo.h)()
+│   %6 = (+)(%3, %4, %5)
+└──      return %6
+)
+CodeInfo(
+    @ /Users/mccoybecker/dev/Mixtape.jl/examples/simple.jl:7 within `h'
+1 ─ %1 = (rand)()
+└──      return %1
+)
+```
+
+After:
 
 ```
 CodeInfo(

@@ -34,6 +34,7 @@ function swap(e::Expr)
 end
 
 function transform(::MyMix, b)
+    display(b)
     for (v, st) in b
         replace!(b, v, swap(st))
     end

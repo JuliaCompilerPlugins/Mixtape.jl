@@ -8,8 +8,8 @@
 > **Note**: Usage of this compiler package requires `julia > 1.6`.
 
 ```julia
-pkg> add https://github.com/femtomc/CodeInfoTools.jl
-pkg> add https://github.com/femtomc/Mixtape.jl
+] add https://github.com/femtomc/CodeInfoTools.jl
+] add https://github.com/femtomc/Mixtape.jl
 ```
 
 ---

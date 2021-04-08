@@ -35,17 +35,17 @@ function transform(::MyMix, b)
     for (v, st) in b
         replace!(b, v, swap(st))
     end
-    display(b)
     return b
 end
 
 
 fn = Mixtape.jit(MyMix(), f, Tuple{Int64})
 fn(5)
-@btime fn(5)
 Mixtape.call(MyMix(), f, 5)
-@btime Mixtape.call(MyMix(), f, 5)
 f(5)
+
+@btime fn(5)
+@btime Mixtape.call(MyMix(), f, 5)
 @btime f(5)
 
 end # module

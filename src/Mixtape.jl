@@ -602,12 +602,10 @@ end
 
 @inline (entry::Entry)(args...) = __call(entry, args)
 
-@generated function __call(entry::Entry{F, TT}, args::TT) where {F, TT} 
-    args = Any[args.parameters...]
-    expr = quote
-        ccall(entry.func, Any, (Any, Ptr{Any}, Int32), entry.f, $(args), $(length(args)))
-    end
-    expr
+# Slow ABI
+function __call(entry::Entry{F,TT}, args::TT) where {F,TT}
+    args = Any[args...]
+    return ccall(entry.func, Any, (Any, Ptr{Any}, Int32), entry.f, args, length(args))
 end
 
 function call(ctx::CompilationContext, f::F, args...) where F

@@ -1,5 +1,10 @@
 # Mixtape.jl
 
+<p align="center">
+<img height="200" src="assets/mixtape.png"/>
+</p>
+<br>
+
 > **Note**: Usage of this compiler package requires `Julia > 1.6`.
 
 ```julia

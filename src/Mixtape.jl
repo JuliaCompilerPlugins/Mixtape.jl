@@ -246,9 +246,11 @@ end
 
 function infer(wvc, mi, interp)
     src = Core.Compiler.typeinf_ext_toplevel(interp, mi)
+    ret = Any
     try
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
         as = mi.specTypes.parameters[2 : end]
+        ret = Core.Compiler.return_type(interp, fn, as)
         if check(interp.ctx, mi.def.module, fn, as...) && show_after_inference(interp.ctx)
             println("(Inferred) $fn in $(mi.def.module)")
             display(src)
@@ -261,7 +263,7 @@ function infer(wvc, mi, interp)
     if ci !== nothing && ci.inferred === nothing
         ci.inferred = src
     end
-    return
+    return ret
 end
 
 # Replace usage sited of `retrieve_code_info`, OptimizationState is one such, but in all interesting use-cases
@@ -294,7 +296,7 @@ function cpu_compile(ctx, mi, world)
 
     # populate the cache
     if cpu_cache_lookup(mi, world, world) === nothing
-        cpu_infer(ctx, mi, world, world)
+        rt = cpu_infer(ctx, mi, world, world)
     end
 
     native_code = ccall(:jl_create_native, Ptr{Cvoid},
@@ -327,7 +329,7 @@ function cpu_compile(ctx, mi, world)
     @assert llvm_specfunc_ref != C_NULL
     llvm_specfunc = LLVM.Function(llvm_specfunc_ref)
 
-    return llvm_specfunc, llvm_func, llvm_mod
+    return (rt, llvm_specfunc, llvm_func, llvm_mod)
 end
 
 function method_instance(@nospecialize(f), @nospecialize(tt), world)
@@ -555,7 +557,7 @@ end
 using GPUCompiler: GPUCompiler, CompilerJob
 import GPUCompiler: FunctionSpec, AbstractCompilerTarget, AbstractCompilerParams
 
-struct Entry{F,TT}
+struct Entry{F, RT, TT}
     f::F
     specfunc::Ptr{Cvoid}
     func::Ptr{Cvoid}
@@ -563,13 +565,13 @@ end
 
 const compiled_cache = Dict{UInt,Any}()
 
-function jit(ctx::CompilationContext, f::F, tt::TT=Tuple{}) where {F,TT<:Type}
+function jit(ctx::CompilationContext, f::F, tt::TT=Tuple{}) where {F, TT<:Type}
     fspec = FunctionSpec(f, tt, false, nothing) #=name=#
     job = CompilerJob(LLVMCompilerTarget(), fspec, LLVMCompilerParams(ctx))
-    return GPUCompiler.cached_compilation(compiled_cache, job, _jit, _link)::Entry{F,tt}
+    return GPUCompiler.cached_compilation(compiled_cache, job, _jit, _link)
 end
 
-function _link(job::CompilerJob, (llvm_mod, func_name, specfunc_name))
+function _link(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
     fspec = job.source
     jitted_mod = compile!(orc[], llvm_mod)
     specfunc_addr = addressin(orc[], jitted_mod, specfunc_name)
@@ -579,30 +581,30 @@ function _link(job::CompilerJob, (llvm_mod, func_name, specfunc_name))
     if specfunc_ptr === C_NULL || func_ptr === C_NULL
         @error "Compilation error" fspec specfunc_ptr func_ptr
     end
-    return Entry{typeof(fspec.f),fspec.tt}(fspec.f, specfunc_ptr, func_ptr)
+    return Entry{typeof(fspec.f), rt, fspec.tt}(fspec.f, specfunc_ptr, func_ptr)
 end
 
 function _jit(job::CompilerJob)
-    llvm_specfunc, llvm_func, llvm_mod = codegen(job.params.ctx, job.source.f, job.source.tt)
+    rt, llvm_specfunc, llvm_func, llvm_mod = codegen(job.params.ctx, job.source.f, job.source.tt)
     specfunc_name = LLVM.name(llvm_specfunc)
     func_name = LLVM.name(llvm_func)
     linkage!(llvm_func, LLVM.API.LLVMExternalLinkage)
     linkage!(llvm_specfunc, LLVM.API.LLVMExternalLinkage)
     run_pipeline!(llvm_mod)
-    return (llvm_mod, func_name, specfunc_name)
+    return (rt, llvm_mod, func_name, specfunc_name)
 end
 
-function abi(T::DataType)
-    if isprimitivetype(T)
-        return T
-    else
-        return Any
-    end
-end
-
+#####
+##### Call interface
+#####
+        
+# work around https://github.com/JuliaLang/julia/issues/37778
+__normalize(::Type{Base.RefValue{T}}) where T = Ref{T}
+__normalize(::Type{Base.RefArray{T}}) where T = Ref{T}
+__normalize(T::DataType) = T
+        
 @inline (entry::Entry)(args...) = __call(entry, args)
-
-@generated function __call(entry::Entry{F, TT}, args::TT) where {F, TT} 
+@generated function __call(entry::Entry{F, RT, TT}, args::TT) where {F, RT, TT}
     args = Any[args.parameters...]
     expr = quote
         ccall(entry.func, Any, (Any, Ptr{Any}, Int32), entry.f, $(args), $(length(args)))
@@ -610,10 +612,28 @@ end
     expr
 end
 
-function call(ctx::CompilationContext, f::F, args...) where F
-    TT = Tuple{map(Core.Typeof, args)...}
-    entry = jit(ctx, f, TT)
-    return entry(args...)
+macro load_call_interface()
+    expr = quote
+        function cached_call(entry::Mixtape.Entry{F, RT, TT}, args...) where {F, RT, TT}
+            vargs = Any[args...]
+    
+            # Fast ABI.
+            #ccall(entry.func, Any, (Any, $(nargs...), ), entry.f, $(_args...))
+
+            # Slow ABI.
+            expr = Expr(:call, :ccall, entry.func, 
+                        Any, Expr(:tuple, Any, Ptr{Any}, Int32),
+                        entry.f, vargs, length(vargs))
+            expr
+        end
+
+        @generated function call(ctx::Mixtape.CompilationContext, f::F, args...) where F
+            TT = Tuple{args...}
+            entry = Mixtape.jit(ctx(), F.instance, TT)
+            return cached_call(entry, args...)
+        end
+    end
+    esc(expr)
 end
 
 end # module

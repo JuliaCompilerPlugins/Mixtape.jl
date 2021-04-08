@@ -53,6 +53,9 @@ display(call(MyMix(), f, 6))
 
 # Native.
 f(5)
+
+@btime fn(5)
+@btime Mixtape.call(MyMix(), f, 5)
 @btime f(5)
 
 end # module

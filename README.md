@@ -5,7 +5,7 @@
 </p>
 <br>
 
-> **Note**: Usage of this compiler package requires `julia > 1.6`.
+> **Note**: Usage of this package requires `julia >= 1.6`.
 
 ```
 ] add https://github.com/femtomc/CodeInfoTools.jl

@@ -35,7 +35,7 @@ import Mixtape: CompilationContext,
                 debug
 ```
 
-`Mixtape.jl` exports a set of interfaces which allows you to interface with aspects of Julia's type inference to modify pre-inferred method instances statically. This code can then be executed as part of a self-managed code generation pipeline. This code generation pipeline works through the [LLVM.jl](https://github.com/maleadt/LLVM.jl) and [GPUCompiler.jl](https://github.com/JuliaGPU/GPUCompiler.jl) infrastructure.
+`Mixtape.jl` exports a set of interfaces which allows you to interact with aspects of Julia's type inference to modify pre-inferred method instances _before inference_. This code can then be executed as part of a self-managed code generation pipeline. This code generation pipeline works through the [LLVM.jl](https://github.com/maleadt/LLVM.jl) and [GPUCompiler.jl](https://github.com/JuliaGPU/GPUCompiler.jl) infrastructure.
 
 > In other words, you can futz with stuff without refactoring the stuff.
 

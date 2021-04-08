@@ -25,11 +25,14 @@ import Core.Compiler: retrieve_code_info, validate_code_in_debug_mode
 
 # Optimizer
 import Core.Compiler: optimize
-#import Core.Compiler: CodeInfo, convert_to_ircode, copy_exprargs, slot2reg, compact!, coverage_enabled, adce_pass!
-#import Core.Compiler: ssa_inlining_pass!, getfield_elim_pass!, type_lift_pass!, verify_ir, verify_linetable
+import Core.Compiler: CodeInfo, convert_to_ircode, copy_exprargs, slot2reg, compact!,
+                      coverage_enabled, adce_pass!
+import Core.Compiler: ssa_inlining_pass!, getfield_elim_pass!, type_lift_pass!, verify_ir,
+                      verify_linetable
+
 
 # JIT
-using GPUCompiler: GPUCompiler
+using GPUCompiler: GPUCompiler, CompilerJob
 import GPUCompiler: FunctionSpec, AbstractCompilerTarget, AbstractCompilerParams
 
 #####
@@ -352,8 +355,6 @@ end
 ##### Optimize
 #####
 
-import Core.Compiler: optimize
-
 function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
                   params::OptimizationParams, @nospecialize(result))
     nargs = Int(opt.nargs) - 1
@@ -365,11 +366,6 @@ function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
     end
     return Core.Compiler.finish(opt, params, ir, result)
 end
-
-import Core.Compiler: CodeInfo, convert_to_ircode, copy_exprargs, slot2reg, compact!,
-                      coverage_enabled, adce_pass!
-import Core.Compiler: ssa_inlining_pass!, getfield_elim_pass!, type_lift_pass!, verify_ir,
-                      verify_linetable
 
 function run_passes(ci::CodeInfo, nargs::Int, sv::OptimizationState)
     preserve_coverage = coverage_enabled(sv.mod)
@@ -551,11 +547,8 @@ function run_pipeline!(mod::LLVM.Module)
 end
 
 #####
-##### JIT
+##### JIT with GPUCompiler
 #####
-
-using GPUCompiler: GPUCompiler, CompilerJob
-import GPUCompiler: FunctionSpec, AbstractCompilerTarget, AbstractCompilerParams
 
 struct Entry{F, RT, TT}
     f::F
@@ -603,11 +596,10 @@ __normalize(::Type{Base.RefValue{T}}) where T = Ref{T}
 __normalize(::Type{Base.RefArray{T}}) where T = Ref{T}
 __normalize(T::DataType) = T
         
-@inline (entry::Entry)(args...) = __call(entry, args)
-@generated function __call(entry::Entry{F, RT, TT}, args::TT) where {F, RT, TT}
-    args = Any[args.parameters...]
+@generated function (entry::Entry{F, RT, TT})(args...) where {F, RT, TT}
     expr = quote
-        ccall(entry.func, Any, (Any, Ptr{Any}, Int32), entry.f, $(args), $(length(args)))
+        args = Any[args...]
+        ccall(entry.func, Any, (Any, Ptr{Any}, Int32), entry.f, args, length(args))
     end
     expr
 end
@@ -615,16 +607,22 @@ end
 macro load_call_interface()
     expr = quote
         function cached_call(entry::Mixtape.Entry{F, RT, TT}, args...) where {F, RT, TT}
-            vargs = Any[args...]
-    
-            # Fast ABI.
+
+            # TODO: Fast ABI.
             #ccall(entry.func, Any, (Any, $(nargs...), ), entry.f, $(_args...))
 
-            # Slow ABI.
-            expr = Expr(:call, :ccall, entry.func, 
-                        Any, Expr(:tuple, Any, Ptr{Any}, Int32),
-                        entry.f, vargs, length(vargs))
-            expr
+            # Slow ABI. Requires an array allocation.
+            expr = quote
+                vargs = Any[args...]
+                ccall($(entry.func),
+                      Any,
+                      (Any, Ptr{Any}, Int32),
+                      $(entry.f),
+                      vargs,
+                      $(length(args)),
+                     )
+            end
+            return expr
         end
 
         @generated function call(ctx::Mixtape.CompilationContext, f::F, args...) where F

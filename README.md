@@ -5,11 +5,11 @@
 </p>
 <br>
 
-> **Note**: Usage of this compiler package requires `Julia > 1.6`.
+> **Note**: Usage of this compiler package requires `julia > 1.6`.
 
 ```julia
-add https://github.com/femtomc/CodeInfoTools.jl
-add https://github.com/femtomc/Mixtape.jl
+pkg> add https://github.com/femtomc/CodeInfoTools.jl
+pkg> add https://github.com/femtomc/Mixtape.jl
 ```
 
 ---

@@ -561,14 +561,6 @@ struct Entry{F,TT}
     func::Ptr{Cvoid}
 end
 
-# Slow ABI
-function __call(entry::Entry{F,TT}, args::TT) where {F,TT}
-    args = Any[args...]
-    return ccall(entry.func, Any, (Any, Ptr{Any}, Int32), entry.f, args, length(args))
-end
-
-(entry::Entry)(args...) = __call(entry, args)
-
 const compiled_cache = Dict{UInt,Any}()
 
 function jit(ctx::CompilationContext, f::F, tt::TT=Tuple{}) where {F,TT<:Type}
@@ -598,6 +590,30 @@ function _jit(job::CompilerJob)
     linkage!(llvm_specfunc, LLVM.API.LLVMExternalLinkage)
     run_pipeline!(llvm_mod)
     return (llvm_mod, func_name, specfunc_name)
+end
+
+function abi(T::DataType)
+    if isprimitivetype(T)
+        return T
+    else
+        return Any
+    end
+end
+
+@inline (entry::Entry)(args...) = __call(entry, args)
+
+@generated function __call(entry::Entry{F, TT}, args::TT) where {F, TT} 
+    args = Any[args.parameters...]
+    expr = quote
+        ccall(entry.func, Any, (Any, Ptr{Any}, Int32), entry.f, $(args), $(length(args)))
+    end
+    expr
+end
+
+function call(ctx::CompilationContext, f::F, args...) where F
+    TT = Tuple{map(Core.Typeof, args)...}
+    entry = jit(ctx, f, TT)
+    return entry(args...)
 end
 
 end # module

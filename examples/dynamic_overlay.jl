@@ -3,6 +3,7 @@ module DynamicOverlay
 using Mixtape
 import Mixtape: CompilationContext, transform, allow_transform, show_after_inference, show_after_optimization, debug
 using MacroTools
+using BenchmarkTools
 
 foo(x) = x^5
 bar(x) = x^10
@@ -39,8 +40,12 @@ function transform(::MyMix, b)
 end
 
 
-fn = Mixtape.jit(MyMix(), f, Tuple{Float64})
-display(fn(2.0))
-display(fn(6.0))
+fn = Mixtape.jit(MyMix(), f, Tuple{Int64})
+fn(5)
+@btime fn(5)
+Mixtape.call(MyMix(), f, 5)
+@btime Mixtape.call(MyMix(), f, 5)
+f(5)
+@btime f(5)
 
 end # module

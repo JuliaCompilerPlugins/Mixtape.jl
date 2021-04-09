@@ -189,7 +189,7 @@ show_after_optimization(f::CompilationContext) = false
 debug(f::CompilationContext) = false
 transform(ctx::CompilationContext, ir) = ir
 
-function check(ctx::CompilationContext, mod::Module, fn, args...)
+function allow_transform(ctx::CompilationContext, mod::Module, fn, args...)
     return allow_transform(ctx, mod) || allow_transform(ctx, fn, args...)
 end
 
@@ -259,7 +259,7 @@ function infer(wvc, mi, interp)
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
         as = mi.specTypes.parameters[2:end]
         ret = Core.Compiler.return_type(interp, fn, as)
-        if check(interp.ctx, mi.def.module, fn, as...) && show_after_inference(interp.ctx)
+        if allow_transform(interp.ctx, mi.def.module, fn, as...) && show_after_inference(interp.ctx)
             println("(Inferred) $fn in $(mi.def.module)")
             display(src)
         end
@@ -308,7 +308,7 @@ function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeIn
             print("@ ($(meth.file), #$(meth.line))\n")
             print("| Entering: $(meth.module).$(fn)\n")
         end
-        if check(interp.ctx, result.linfo.def.module, fn, as...)
+        if allow_transform(interp.ctx, result.linfo.def.module, fn, as...)
             b = CodeInfoTools.Builder(src, length(result.argtypes[2:end]))
             b = transform(interp.ctx, b)
             e = detect_invoke(b, result.linfo)

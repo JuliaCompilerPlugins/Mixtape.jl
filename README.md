@@ -16,6 +16,8 @@
 
 `Mixtape.jl` is a static method overlay and optimization tool which operates during Julia type inference. It allows you to (precisely) insert semantic-intruding changes to lowered code (e.g. replace `CodeInfo`, pre-optimize `CodeInfo`, and create other forms of static analysis tools on uninferred `CodeInfo`) _before optimization_. It also allows you to customize the optimization pipeline -- allowing users to write semantic-preserving passes on [Core.Compiler.IRCode](https://github.com/JuliaLang/julia/blob/master/base/compiler/ssair/ir.jl) which operate _after inference_.
 
+> **Note**: `Mixtape.jl` manages its own code cache and execution engine through [LLVM.jl](https://github.com/maleadt/LLVM.jl) and [GPUCompiler.jl](https://github.com/JuliaGPU/GPUCompiler.jl) -- so it is less part of Julia's native pipeline, and closer to a separate compiler pipeline. In the future, parts of `Mixtape.jl` may be integrated into the compiler.
+
 In many respects, it is similar to [Cassette.jl](https://github.com/JuliaLabs/Cassette.jl) -- _but it is completely static_.
 
 > **Note**: the architecture for this package can be found in many other places. The interested reader might look at [KernelCompiler.jl](https://github.com/vchuravy/KernelCompiler.jl), [Enzyme.jl](https://github.com/wsmoses/Enzyme.jl), [the Julia frontend to brutus](https://github.com/JuliaLabs/brutus/blob/master/Brutus/src/Brutus.jl), and the [compiler interface in GPUCompiler.jl](https://github.com/JuliaGPU/GPUCompiler.jl/blob/master/src/interface.jl) to understand this a bit better.

@@ -5,7 +5,7 @@
 </p>
 <br>
 
-[![Build Status][build-img]][build-url] [![CodeCov][codecov-img]][codecov-url] [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://femtomc.github.io/CodeInfoTools.jl/stable)
+[![Build Status][build-img]][build-url] [![CodeCov][codecov-img]][codecov-url] [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://femtomc.github.io/CodeInfoTools.jl/dev)
 
 [build-img]: https://github.com/femtomc/CodeInfoTools.jl/workflows/CI/badge.svg
 [build-url]: https://github.com/femtomc/CodeInfoTools.jl/actions

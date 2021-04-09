@@ -23,8 +23,8 @@ end
 struct MyMix <: CompilationContext end
 
 allow(ctx::MyMix, m::Module, fn, args...) = m == Target
-
 show_after_inference(ctx::MyMix) = false
+show_after_optimization(ctx::MyMix) = true
 debug(ctx::MyMix) = false
 
 mutable struct Recorder
@@ -48,11 +48,6 @@ function transform(::MyMix, b)
         v == 1 || replace!(b, v, e)
     end
     return b
-end
-
-function optimize!(::MyMix, ir)
-    display(ir)
-    ir
 end
 
 Mixtape.@load_call_interface()

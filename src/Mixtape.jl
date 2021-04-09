@@ -256,12 +256,14 @@ end
 function infer(wvc, mi, interp)
     src = Core.Compiler.typeinf_ext_toplevel(interp, mi)
     ret = Any
+    meth = mi.def
     try
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
         as = map(resolve, mi.specTypes.parameters[2:end])
         ret = Core.Compiler.return_type(interp, fn, as)
         if allow(interp.ctx, mi.def.module, fn, as...) && show_after_inference(interp.ctx)
-            println("(Inferred) $(mi.def.module).$fn")
+            print("@ ($(meth.file), L$(meth.line))\n")
+            print("| (inf) $(mi.def.module).$fn\n")
             display(src)
         end
     catch e
@@ -282,7 +284,7 @@ struct InvokeException <: Exception
     line
 end
 function Base.show(io::IO, ie::InvokeException)
-    print("@ $(ie.file) #$(ie.line)\n")
+    print("@ ($(ie.file), L$(ie.line))\n")
     print("| (Found call to invoke): $(ie.mod).$(ie.name)\n")
 end
 
@@ -427,7 +429,8 @@ function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
             ir = optimize!(interp.ctx, ir)
         end
         if allow(interp.ctx, mi.def.module, fn, as...) && show_after_optimization(interp.ctx)
-            println("(Optimized) $(opt.linfo.def.module).$fn")
+            print("@ ($(meth.file), #$(meth.line))\n")
+            print("| (opt) $(opt.linfo.def.module).$fn\n")
             display(ir)
         end
     catch e

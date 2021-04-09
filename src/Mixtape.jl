@@ -1,6 +1,6 @@
 module Mixtape
 
-using MacroTools: isexpr
+using MacroTools: isexpr, @capture, rmlines, unblock, postwalk
 using CodeInfoTools
 using Core.Compiler
 using Core.Compiler: MethodInstance, NativeInterpreter, CodeInfo, CodeInstance, WorldView,
@@ -38,7 +38,7 @@ resolve(c::Core.Const) = c.val
 
 # Exports.
 export CompilationContext, allow, transform, optimize!, show_after_inference,
-       show_after_optimization, debug, @intrinsic
+       show_after_optimization, debug, @ctx, @intrinsic
 
 #####
 ##### Cache
@@ -194,6 +194,27 @@ function allow(ctx::CompilationContext, mod::Module, fn, args...)
     return allow(ctx, mod) || allow(ctx, fn, args...)
 end
 
+macro ctx(properties, expr)
+    @assert(@capture(expr, struct Name_ body__ end))
+    @assert(properties.head == :tuple)
+    properties = properties.args
+    ex = Expr(:block, 
+              quote
+                  import Mixtape: allow, show_after_inference, show_after_optimization, debug, transform, optimize!
+              end,
+              quote struct $Name <: Mixtape.CompilationContext
+                      $(body...)
+                  end
+              end,
+              quote 
+                  show_after_inference(::$Name) = $(properties[1])
+                  show_after_optimization(::$Name) = $(properties[2])
+                  debug(::$Name) = $(properties[3])
+              end)
+    ex = postwalk(rmlines ∘ unblock, ex)
+    esc(ex)
+end
+
 struct MixtapeInterpreter{Ctx<:CompilationContext,Inner<:AbstractInterpreter} <:
        AbstractInterpreter
     ctx::Ctx
@@ -304,8 +325,8 @@ function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeIn
         fn = resolve(GlobalRef(meth.module, meth.name))
         as = map(resolve, result.argtypes[2:end])
         if debug(interp.ctx)
-            print("@ ($(meth.file), #$(meth.line))\n")
-            print("| (infer): $(meth.module).$(fn)\n")
+            print("@ ($(meth.file), L$(meth.line))\n")
+            print("| beg (inf): $(meth.module).$(fn)\n")
         end
         if allow(interp.ctx, meth.module, fn, as...)
             b = CodeInfoTools.Builder(src, length(result.argtypes[2:end]))
@@ -423,17 +444,25 @@ function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
         end
         if debug(interp.ctx)
             println("@ ($(meth.file), L$(meth.line))")
-            println("| (opt): $(meth.module).$(fn)")
+            println("| end (inf): $(meth.module).$(fn)")
+            println("@ ($(meth.file), L$(meth.line))")
+            println("| beg (opt): $(meth.module).$(fn)")
         end
         if allow(interp.ctx, mi.def.module, fn, as...)
             ir = optimize!(interp.ctx, ir)
         end
+        ret = Core.Compiler.finish(opt, params, ir, result)
         if allow(interp.ctx, mi.def.module, fn, as...) &&
            show_after_optimization(interp.ctx)
             print("@ ($(meth.file), L$(meth.line))\n")
             print("| (opt) $(opt.linfo.def.module).$fn\n")
-            display(ir)
+            display(opt.src)
         end
+        if debug(interp.ctx)
+            println("@ ($(meth.file), L$(meth.line))")
+            println("| end (opt): $(meth.module).$(fn)")
+        end
+        return ret
     catch e
         push!(interp, e)
     end

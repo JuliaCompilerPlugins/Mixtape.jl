@@ -15,7 +15,7 @@ end
 end
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow_transform, show_after_inference,
+import Mixtape: CompilationContext, transform, allow, show_after_inference,
                 show_after_optimization, debug
 using MacroTools
 
@@ -43,7 +43,7 @@ function transform(::MyMix, b)
 end
 
 # MyMix will only transform functions which you explicitly allow.
-allow_transform(ctx::MyMix, m::Module) = m == SubFoo
+allow(ctx::MyMix, m::Module) = m == SubFoo
 show_after_inference(ctx::MyMix) = false
 show_after_optimization(ctx::MyMix) = false
 debug(ctx::MyMix) = true

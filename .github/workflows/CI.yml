@@ -54,8 +54,7 @@ jobs:
       - run: |
           julia --project=docs -e '
             using Pkg
-            Pkg.add("https://github.com/femtomc/CodeInfoTools.jl")
-            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.add(url="https://github.com/femtomc/CodeInfoTools.jl")
             Pkg.instantiate()'
       - run: julia --project=docs docs/make.jl
         env:

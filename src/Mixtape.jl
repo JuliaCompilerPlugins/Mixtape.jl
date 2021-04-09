@@ -335,8 +335,9 @@ function cpu_compile(ctx, mi, world)
 
     # populate the cache
     if cpu_cache_lookup(mi, world, world) === nothing
-        rt = cpu_infer(ctx, mi, world, world)
+        cpu_infer(ctx, mi, world, world)
     end
+    rt = Any
 
     native_code = ccall(:jl_create_native, Ptr{Cvoid},
                         (Vector{Core.MethodInstance}, Base.CodegenParams, Cint), [mi],

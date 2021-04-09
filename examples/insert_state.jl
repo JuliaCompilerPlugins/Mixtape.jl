@@ -50,6 +50,11 @@ function transform(::MyMix, b)
     return b
 end
 
+function optimize!(::MyMix, ir)
+    display(ir)
+    ir
+end
+
 Mixtape.@load_call_interface()
 
 function (r::Recorder)(f::Function, args...)

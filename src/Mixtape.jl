@@ -37,7 +37,7 @@ resolve(gr::GlobalRef) = getproperty(gr.mod, gr.name)
 resolve(c::Core.Const) = c.val
 
 # Exports.
-export CompilationContext, transform, allow, show_after_inference,
+export CompilationContext, allow, transform, optimize!, show_after_inference,
        show_after_optimization, debug
 
 #####
@@ -188,7 +188,7 @@ show_after_inference(f::CompilationContext) = false
 show_after_optimization(f::CompilationContext) = false
 debug(f::CompilationContext) = false
 transform(ctx::CompilationContext, b) = b
-optimize!(ctx::CompilationContext, ir::Core.Compiler.IRCode) = ir
+optimize!(ctx::CompilationContext, ir) = ir
 
 function allow(ctx::CompilationContext, mod::Module, fn, args...)
     return allow(ctx, mod) || allow(ctx, fn, args...)

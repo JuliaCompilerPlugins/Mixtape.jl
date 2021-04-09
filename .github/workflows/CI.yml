@@ -56,7 +56,7 @@ jobs:
             using Pkg
             Pkg.add(url="https://github.com/femtomc/CodeInfoTools.jl")
             Pkg.add(url="https://github.com/femtomc/Mixtape.jl")
-            Pkg.instantiate()'
+            Pkg.add(url="Documenter")'
       - run: julia --project=docs docs/make.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

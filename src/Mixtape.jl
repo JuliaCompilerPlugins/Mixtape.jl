@@ -195,24 +195,26 @@ function allow(ctx::CompilationContext, mod::Module, fn, args...)
 end
 
 macro ctx(properties, expr)
-    @assert(@capture(expr, struct Name_ body__ end))
+    @assert(@capture(expr, struct Name_
+                         body__
+                     end))
     @assert(properties.head == :tuple)
     properties = properties.args
-    ex = Expr(:block, 
+    ex = Expr(:block,
               quote
-                  import Mixtape: allow, show_after_inference, show_after_optimization, debug, transform, optimize!
-              end,
-              quote struct $Name <: Mixtape.CompilationContext
+                  import Mixtape: allow, show_after_inference, show_after_optimization,
+                                  debug, transform, optimize!
+              end, quote
+                  struct $Name <: Mixtape.CompilationContext
                       $(body...)
                   end
-              end,
-              quote 
+              end, quote
                   show_after_inference(::$Name) = $(properties[1])
                   show_after_optimization(::$Name) = $(properties[2])
                   debug(::$Name) = $(properties[3])
               end)
     ex = postwalk(rmlines ∘ unblock, ex)
-    esc(ex)
+    return esc(ex)
 end
 
 struct MixtapeInterpreter{Ctx<:CompilationContext,Inner<:AbstractInterpreter} <:
@@ -357,6 +359,8 @@ function cpu_compile(ctx, mi, world)
     if cpu_cache_lookup(mi, world, world) === nothing
         cpu_infer(ctx, mi, world, world)
     end
+
+    # TODO: actual return type.
     rt = Any
 
     native_code = ccall(:jl_create_native, Ptr{Cvoid},
@@ -379,7 +383,7 @@ function cpu_compile(ctx, mi, world)
     @assert llvm_func_idx[] != -1
     @assert llvm_specfunc_idx[] != -1
 
-    # get the top-level function)
+    # get the top-level function
     llvm_func_ref = ccall(:jl_get_llvm_function, LLVM.API.LLVMValueRef,
                           (Ptr{Cvoid}, UInt32), native_code, llvm_func_idx[] - 1)
     @assert llvm_func_ref != C_NULL

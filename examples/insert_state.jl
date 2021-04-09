@@ -65,7 +65,6 @@ function (r::Recorder)(f::Function, args...)
     return r
 end
 
-
 Mixtape.@load_call_interface()
 display(call(MyMix(), Target.foo, 5.0))
 @btime call(MyMix(), Target.foo, 5.0)

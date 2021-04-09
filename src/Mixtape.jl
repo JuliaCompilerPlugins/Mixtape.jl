@@ -38,7 +38,7 @@ resolve(c::Core.Const) = c.val
 
 # Exports.
 export CompilationContext, allow, transform, optimize!, show_after_inference,
-       show_after_optimization, debug
+       show_after_optimization, debug, @intrinsic
 
 #####
 ##### Cache
@@ -261,11 +261,6 @@ function infer(wvc, mi, interp)
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
         as = map(resolve, mi.specTypes.parameters[2:end])
         ret = Core.Compiler.return_type(interp, fn, as)
-        if allow(interp.ctx, mi.def.module, fn, as...) && show_after_inference(interp.ctx)
-            print("@ ($(meth.file), L$(meth.line))\n")
-            print("| (inf) $(mi.def.module).$fn\n")
-            display(src)
-        end
     catch e
         push!(interp, e)
     end
@@ -278,14 +273,14 @@ function infer(wvc, mi, interp)
 end
 
 struct InvokeException <: Exception
-    name
-    mod
-    file
-    line
+    name::Any
+    mod::Any
+    file::Any
+    line::Any
 end
 function Base.show(io::IO, ie::InvokeException)
     print("@ ($(ie.file), L$(ie.line))\n")
-    print("| (Found call to invoke): $(ie.mod).$(ie.name)\n")
+    return print("| (Found call to invoke): $(ie.mod).$(ie.name)\n")
 end
 
 function detect_invoke(b, linfo)
@@ -421,6 +416,11 @@ function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
     try
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
         as = map(resolve, mi.specTypes.parameters[2:end])
+        if allow(interp.ctx, mi.def.module, fn, as...) && show_after_inference(interp.ctx)
+            print("@ ($(meth.file), L$(meth.line))\n")
+            print("| (inf) $(mi.def.module).$fn\n")
+            display(opt.src)
+        end
         if debug(interp.ctx)
             println("@ ($(meth.file), L$(meth.line))")
             println("| (opt): $(meth.module).$(fn)")
@@ -428,7 +428,8 @@ function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
         if allow(interp.ctx, mi.def.module, fn, as...)
             ir = optimize!(interp.ctx, ir)
         end
-        if allow(interp.ctx, mi.def.module, fn, as...) && show_after_optimization(interp.ctx)
+        if allow(interp.ctx, mi.def.module, fn, as...) &&
+           show_after_optimization(interp.ctx)
             print("@ ($(meth.file), L$(meth.line))\n")
             print("| (opt) $(opt.linfo.def.module).$fn\n")
             display(ir)
@@ -438,7 +439,6 @@ function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
     end
     return Core.Compiler.finish(opt, params, ir, result)
 end
-
 
 #####
 ##### LLVM optimization pipeline
@@ -684,6 +684,24 @@ macro load_call_interface()
         end
     end
     return esc(expr)
+end
+
+#####
+##### Intrinsics
+#####
+
+abstract type IntrinsicFunction end
+
+function intrinsic_m(name::Symbol)
+    tname = Symbol(name, :_intr)
+    return quote
+        Core.@__doc__ struct $tname <: Mixtape.IntrinsicFunction end
+        Core.@__doc__ const $name = $tname()
+    end
+end
+
+macro intrinsic(ex)
+    return esc(intrinsic_m(ex))
 end
 
 end # module

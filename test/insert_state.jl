@@ -20,7 +20,7 @@ debug(ctx::MyMix) = false
 
 mutable struct Recorder
     d::Dict
-    ret
+    ret::Any
     Recorder() = new(Dict(), nothing)
     Recorder(d, ret) = new(d, ret)
 end
@@ -28,7 +28,7 @@ end
 swap(r, e) = e
 function swap(r, e::Expr)
     e.head == :call || return e
-    return Expr(:call, r, e.args[1 : end]...)
+    return Expr(:call, r, e.args[1:end]...)
 end
 
 function transform(::MyMix, b)

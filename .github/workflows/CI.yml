@@ -32,8 +32,6 @@ jobs:
           path: ~/.julia/artifacts
           key: ${{ runner.os }}-test-artifacts-${{ hashFiles('**/Project.toml') }}
           restore-keys: ${{ runner.os }}-test-artifacts
-        with:
-          version: '1.6'
       - run: |
           julia --project=. -e '
             using Pkg

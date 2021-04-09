@@ -422,14 +422,14 @@ function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
         as = map(resolve, mi.specTypes.parameters[2:end])
         if debug(interp.ctx)
-            println("@ ($(meth.file), #$(meth.line))")
+            println("@ ($(meth.file), L$(meth.line))")
             println("| (opt): $(meth.module).$(fn)")
         end
         if allow(interp.ctx, mi.def.module, fn, as...)
             ir = optimize!(interp.ctx, ir)
         end
         if allow(interp.ctx, mi.def.module, fn, as...) && show_after_optimization(interp.ctx)
-            print("@ ($(meth.file), #$(meth.line))\n")
+            print("@ ($(meth.file), L$(meth.line))\n")
             print("| (opt) $(opt.linfo.def.module).$fn\n")
             display(ir)
         end

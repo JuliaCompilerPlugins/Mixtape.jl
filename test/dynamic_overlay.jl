@@ -9,7 +9,7 @@ end
 
 struct DynamicMix <: CompilationContext end
 
-allow_transform(ctx::DynamicMix, m::Module) = m == TestMixtape
+allow(ctx::DynamicMix, m::Module) = m == TestMixtape
 
 swap(e) = e
 function swap(e::Expr)

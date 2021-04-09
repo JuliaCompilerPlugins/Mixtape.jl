@@ -17,7 +17,7 @@ end
 g(f) = f()
 
 struct MyMix <: CompilationContext end
-allow_transform(ctx::MyMix, m::Module) = m == TestMixtape
+allow(ctx::MyMix, m::Module) = m == TestMixtape
 
 swap(e) = e
 function swap(e::Expr)

@@ -1,8 +1,7 @@
 module InsertState
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow_transform, show_after_inference,
-                show_after_optimization, debug, @load_call_interface
+import Mixtape: CompilationContext, transform, optimize!, allow, show_after_inference, show_after_optimization, debug, @load_call_interface
 using MacroTools
 using InteractiveUtils
 using BenchmarkTools
@@ -23,10 +22,9 @@ end
 
 struct MyMix <: CompilationContext end
 
-allow_transform(ctx::MyMix, m::Module, fn, args...) = m == Target
+allow(ctx::MyMix, m::Module, fn, args...) = m == Target
 
 show_after_inference(ctx::MyMix) = false
-show_after_optimization(ctx::MyMix) = false
 debug(ctx::MyMix) = false
 
 mutable struct Recorder

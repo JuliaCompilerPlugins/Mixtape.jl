@@ -12,7 +12,7 @@ end
 
 struct MyMix <: CompilationContext end
 
-allow_transform(ctx::MyMix, m::Module, fn, args...) = m == Target
+allow(ctx::MyMix, m::Module, fn, args...) = m == Target
 
 show_after_inference(ctx::MyMix) = false
 show_after_optimization(ctx::MyMix) = false

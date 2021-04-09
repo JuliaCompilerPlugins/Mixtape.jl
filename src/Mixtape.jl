@@ -37,7 +37,7 @@ resolve(gr::GlobalRef) = getproperty(gr.mod, gr.name)
 resolve(c::Core.Const) = c.val
 
 # Exports.
-export CompilationContext, transform, allow_transform, show_after_inference,
+export CompilationContext, transform, allow, show_after_inference,
        show_after_optimization, debug
 
 #####
@@ -183,14 +183,15 @@ end
 # our subtype of AbstractInterpreter
 abstract type CompilationContext end
 struct Fallback <: CompilationContext end
-allow_transform(f::C, args...) where {C<:CompilationContext} = false
+allow(f::C, args...) where {C<:CompilationContext} = false
 show_after_inference(f::CompilationContext) = false
 show_after_optimization(f::CompilationContext) = false
 debug(f::CompilationContext) = false
-transform(ctx::CompilationContext, ir) = ir
+transform(ctx::CompilationContext, b) = b
+optimize!(ctx::CompilationContext, ir::Core.Compiler.IRCode) = ir
 
-function allow_transform(ctx::CompilationContext, mod::Module, fn, args...)
-    return allow_transform(ctx, mod) || allow_transform(ctx, fn, args...)
+function allow(ctx::CompilationContext, mod::Module, fn, args...)
+    return allow(ctx, mod) || allow(ctx, fn, args...)
 end
 
 struct MixtapeInterpreter{Ctx<:CompilationContext,Inner<:AbstractInterpreter} <:
@@ -244,10 +245,10 @@ function cpu_infer(ctx, mi, min_world, max_world)
     if debug(ctx) && !isempty(interp.errors)
         println("\nEncountered the following non-critical errors during interception:")
         for k in interp.errors
-            display(k)
+            println(k)
         end
-        println("This may imply that your transform failed to operate on some calls.")
-        println("\t\t\t______________\t\t")
+        println("\nThis may imply that your transform failed to operate on some calls.")
+        println("\t\t\t  ______________\t\t\n")
     end
     return ret
 end
@@ -257,10 +258,10 @@ function infer(wvc, mi, interp)
     ret = Any
     try
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
-        as = mi.specTypes.parameters[2:end]
+        as = map(resolve, mi.specTypes.parameters[2:end])
         ret = Core.Compiler.return_type(interp, fn, as)
-        if allow_transform(interp.ctx, mi.def.module, fn, as...) && show_after_inference(interp.ctx)
-            println("(Inferred) $fn in $(mi.def.module)")
+        if allow(interp.ctx, mi.def.module, fn, as...) && show_after_inference(interp.ctx)
+            println("(Inferred) $(mi.def.module).$fn")
             display(src)
         end
     catch e
@@ -300,15 +301,16 @@ end
 # it is derived from an InferenceState. There is a third one in `typeinf_ext` in case the module forbids inference.
 function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeInterpreter)
     src = retrieve_code_info(result.linfo)
-    meth = result.linfo.def
+    mi = result.linfo
+    meth = mi.def
     try
-        fn = resolve(GlobalRef(result.linfo.def.module, result.linfo.def.name))
+        fn = resolve(GlobalRef(meth.module, meth.name))
         as = map(resolve, result.argtypes[2:end])
         if debug(interp.ctx)
             print("@ ($(meth.file), #$(meth.line))\n")
-            print("| Entering: $(meth.module).$(fn)\n")
+            print("| (infer): $(meth.module).$(fn)\n")
         end
-        if allow_transform(interp.ctx, result.linfo.def.module, fn, as...)
+        if allow(interp.ctx, meth.module, fn, as...)
             b = CodeInfoTools.Builder(src, length(result.argtypes[2:end]))
             b = transform(interp.ctx, b)
             e = detect_invoke(b, result.linfo)
@@ -392,23 +394,10 @@ end
 ##### Optimize
 #####
 
-function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
-                  params::OptimizationParams, @nospecialize(result))
-    nargs = Int(opt.nargs) - 1
-    ir = run_passes(opt.src, nargs, opt)
-    if show_after_optimization(interp.ctx)
-        fn = resolve(GlobalRef(opt.linfo.def.module, opt.linfo.def.name))
-        println("(Optimized) $fn in $(opt.linfo.def.module)")
-        display(ir)
-    end
-    return Core.Compiler.finish(opt, params, ir, result)
-end
-
 function run_passes(ci::CodeInfo, nargs::Int, sv::OptimizationState)
     preserve_coverage = coverage_enabled(sv.mod)
     ir = convert_to_ircode(ci, copy_exprargs(ci.code), preserve_coverage, nargs, sv)
     ir = slot2reg(ir, ci, nargs, sv)
-    # TODO: Domsorting can produce an updated domtree - no need to recompute here
     ir = compact!(ir)
     ir = ssa_inlining_pass!(ir, ir.linetable, sv.inlining, ci.propagate_inbounds)
     ir = compact!(ir)
@@ -420,6 +409,33 @@ function run_passes(ci::CodeInfo, nargs::Int, sv::OptimizationState)
     verify_linetable(ir.linetable)
     return ir
 end
+
+function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
+                  params::OptimizationParams, @nospecialize(result))
+    nargs = Int(opt.nargs) - 1
+    mi = opt.linfo
+    meth = mi.def
+    ir = run_passes(opt.src, nargs, opt)
+    try
+        fn = resolve(GlobalRef(mi.def.module, mi.def.name))
+        as = map(resolve, mi.specTypes.parameters[2:end])
+        if debug(interp.ctx)
+            println("@ ($(meth.file), #$(meth.line))")
+            println("| (opt): $(meth.module).$(fn)")
+        end
+        if allow(interp.ctx, mi.def.module, fn, as...)
+            ir = optimize!(interp.ctx, ir)
+        end
+        if allow(interp.ctx, mi.def.module, fn, as...) && show_after_optimization(interp.ctx)
+            println("(Optimized) $(opt.linfo.def.module).$fn")
+            display(ir)
+        end
+    catch e
+        push!(interp, e)
+    end
+    return Core.Compiler.finish(opt, params, ir, result)
+end
+
 
 #####
 ##### LLVM optimization pipeline

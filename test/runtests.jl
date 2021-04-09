@@ -2,7 +2,7 @@ module TestMixtape
 
 using Test
 using Mixtape
-import Mixtape: CompilationContext, transform, allow_transform, debug
+import Mixtape: CompilationContext, transform, allow, debug
 using MacroTools
 
 include("dynamic_overlay.jl")

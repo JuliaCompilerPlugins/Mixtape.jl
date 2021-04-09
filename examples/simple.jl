@@ -3,8 +3,10 @@ module How2Mix
 # Unassuming code in an unassuming module...
 module SubFoo
 
+g() = rand()
+
 function h()
-    return rand()
+    return g()
 end
 
 function f()
@@ -16,7 +18,7 @@ end
 end
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow, show_after_inference,
+import Mixtape: CompilationContext, transform, optimize!, allow, show_after_inference,
                 show_after_optimization, debug
 using MacroTools
 
@@ -29,19 +31,21 @@ function swap(e::Expr)
     new = MacroTools.postwalk(e) do s
         isexpr(s, :call) || return s
         s.args[1] == Base.rand || return s
-        return 5
+        return 4
     end
     return new
 end
 
 # This is pre-inference - you get to see a CodeInfoTools.Builder instance.
 function transform(::MyMix, b)
-    display(b)
     for (v, st) in b
         replace!(b, v, swap(st))
     end
-    display(b)
     return b
+end
+
+function optimize!(::MyMix, ir)
+    return ir
 end
 
 # MyMix will only transform functions which you explicitly allow.
@@ -49,11 +53,12 @@ end
 allow(ctx::MyMix, m::Module) = m == SubFoo
 show_after_inference(ctx::MyMix) = false
 show_after_optimization(ctx::MyMix) = false
-debug(ctx::MyMix) = true
+debug(ctx::MyMix) = false
 
 # This loads up a call interface which will cache the result of the pipeline.
 Mixtape.@load_call_interface()
-@assert(call(MyMix(), SubFoo.f) == 15)
-@assert(SubFoo.f() != 15)
+@assert(call(MyMix(), SubFoo.f) == 12)
+@assert(call(MyMix(), SubFoo.f) == 12)
+@assert(SubFoo.f() != 12)
 
 end # module

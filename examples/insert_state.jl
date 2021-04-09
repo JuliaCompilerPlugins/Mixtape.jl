@@ -24,8 +24,8 @@ end
 struct MyMix <: CompilationContext end
 
 allow(ctx::MyMix, m::Module, fn, args...) = m == Target
-show_after_inference(ctx::MyMix) = false
-show_after_optimization(ctx::MyMix) = false
+show_after_inference(ctx::MyMix) = true
+show_after_optimization(ctx::MyMix) = true
 debug(ctx::MyMix) = false
 
 mutable struct Recorder

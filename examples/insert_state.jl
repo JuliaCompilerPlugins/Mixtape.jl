@@ -25,7 +25,7 @@ struct MyMix <: CompilationContext end
 
 allow(ctx::MyMix, m::Module, fn, args...) = m == Target
 show_after_inference(ctx::MyMix) = false
-show_after_optimization(ctx::MyMix) = true
+show_after_optimization(ctx::MyMix) = false
 debug(ctx::MyMix) = false
 
 mutable struct Recorder
@@ -51,8 +51,6 @@ function transform(::MyMix, b)
     return b
 end
 
-Mixtape.@load_call_interface()
-
 function (r::Recorder)(f::Function, args...)
     args = map(a -> a isa Recorder ? a.ret : a, args)
     rec = call(MyMix(), f, args...)
@@ -67,7 +65,8 @@ function (r::Recorder)(f::Function, args...)
     return r
 end
 
-# Mixtape cached call.
+
+Mixtape.@load_call_interface()
 display(call(MyMix(), Target.foo, 5.0))
 @btime call(MyMix(), Target.foo, 5.0)
 

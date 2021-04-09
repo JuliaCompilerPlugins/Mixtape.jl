@@ -6,6 +6,7 @@ module SubFoo
 function h()
     return rand()
 end
+
 function f()
     x = rand()
     y = rand()
@@ -33,6 +34,7 @@ function swap(e::Expr)
     return new
 end
 
+# This is pre-inference - you get to see a CodeInfoTools.Builder instance.
 function transform(::MyMix, b)
     display(b)
     for (v, st) in b
@@ -43,11 +45,13 @@ function transform(::MyMix, b)
 end
 
 # MyMix will only transform functions which you explicitly allow.
+# You can also greenlight modules.
 allow(ctx::MyMix, m::Module) = m == SubFoo
 show_after_inference(ctx::MyMix) = false
 show_after_optimization(ctx::MyMix) = false
 debug(ctx::MyMix) = true
 
+# This loads up a call interface which will cache the result of the pipeline.
 Mixtape.@load_call_interface()
 @assert(call(MyMix(), SubFoo.f) == 15)
 @assert(SubFoo.f() != 15)

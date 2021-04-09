@@ -14,7 +14,7 @@
 
 ---
 
-`Mixtape.jl` is a static method overlay and optimization tool which operates during Julia type inference. It allows you to (precisely) replace `CodeInfo`, pre-optimize `CodeInfo`, and create other forms of static analysis tools on uninferred `CodeInfo` as part of Julia's native type inference system. It also allows you to customize the optimization pipeline after inference -- allowing users to write semantic-preserving passes on [Core.Compiler.IRCode](https://github.com/JuliaLang/julia/blob/master/base/compiler/ssair/ir.jl).
+`Mixtape.jl` is a static method overlay and optimization tool which operates during Julia type inference. It allows you to (precisely) insert semantic-intruding changes to lowered code (e.g. replace `CodeInfo`, pre-optimize `CodeInfo`, and create other forms of static analysis tools on uninferred `CodeInfo`) _before optimization_. It also allows you to customize the optimization pipeline -- allowing users to write semantic-preserving passes on [Core.Compiler.IRCode](https://github.com/JuliaLang/julia/blob/master/base/compiler/ssair/ir.jl) which operate _after inference_.
 
 In many respects, it is similar to [Cassette.jl](https://github.com/JuliaLabs/Cassette.jl) -- _but it is completely static_.
 

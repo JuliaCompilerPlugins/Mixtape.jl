@@ -196,7 +196,7 @@ end
 
 macro ctx(properties, expr)
     @assert(@capture(expr, struct Name_
-                         body__
+                         body__::Any
                      end))
     @assert(properties.head == :tuple)
     properties = properties.args

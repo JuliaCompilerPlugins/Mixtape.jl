@@ -17,7 +17,7 @@ function swap(e::Expr)
     new = MacroTools.postwalk(e) do s
         isexpr(s, :call) || return s
         s.args[1] == Base.:(*) || return s
-        return Expr(:call, Base.:(+), e.args[2 : end]...)
+        return Expr(:call, Base.:(+), e.args[2:end]...)
     end
     return new
 end

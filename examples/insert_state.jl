@@ -42,7 +42,6 @@ function swap(r, e::Expr)
 end
 
 function transform(::MyMix, b)
-    circshift!(b, 1) # Shifts all SSA values by 1
     pushfirst!(b, Expr(:call, Recorder))
     for (v, st) in b
         e = swap(Core.SSAValue(1), st)

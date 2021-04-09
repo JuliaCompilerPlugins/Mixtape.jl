@@ -14,13 +14,13 @@
 
 ---
 
-`Mixtape.jl` is a static method overlay tool which operates during Julia type inference. It allows you to (precisely) replace `CodeInfo`, pre-optimize `CodeInfo`, and create other forms of static analysis tools on uninferred `CodeInfo` as part of Julia's native type inference system.
+`Mixtape.jl` is a static method overlay and optimization tool which operates during Julia type inference. It allows you to (precisely) replace `CodeInfo`, pre-optimize `CodeInfo`, and create other forms of static analysis tools on uninferred `CodeInfo` as part of Julia's native type inference system. It also allows you to customize the optimization pipeline after inference -- allowing users to write semantic-preserving passes on [Core.Compiler.IRCode](https://github.com/JuliaLang/julia/blob/master/base/compiler/ssair/ir.jl).
 
 In many respects, it is similar to [Cassette.jl](https://github.com/JuliaLabs/Cassette.jl) -- _but it is completely static_.
 
 > **Note**: the architecture for this package can be found in many other places. The interested reader might look at [KernelCompiler.jl](https://github.com/vchuravy/KernelCompiler.jl), [Enzyme.jl](https://github.com/wsmoses/Enzyme.jl), [the Julia frontend to brutus](https://github.com/JuliaLabs/brutus/blob/master/Brutus/src/Brutus.jl), and the [compiler interface in GPUCompiler.jl](https://github.com/JuliaGPU/GPUCompiler.jl/blob/master/src/interface.jl) to understand this a bit better.
 >
-> When in doubt, don't be afraid of [typeinfer.jl](https://github.com/JuliaLang/julia/blob/master/base/compiler/typeinfer.jl)!
+> When in doubt, don't be afraid of [typeinfer.jl](https://github.com/JuliaLang/julia/blob/master/base/compiler/typeinfer.jl) and [Julia's SSA form IR](https://github.com/JuliaLang/julia/tree/master/base/compiler/ssair)!
 
 ## Interfaces
 
@@ -28,8 +28,9 @@ In many respects, it is similar to [Cassette.jl](https://github.com/JuliaLabs/Ca
 using Mixtape
 using Mixtape: jit, @load_call_interface
 import Mixtape: CompilationContext, 
+                allow, 
                 transform, 
-                allow_transform, 
+                optimize!,
                 show_after_inference,
                 show_after_optimization, 
                 debug
@@ -39,7 +40,7 @@ import Mixtape: CompilationContext,
 
 > In other words, you can futz with stuff without refactoring the stuff.
 
-Usage typically proceeds as follows.
+Usage of this package might proceed as follows.
 
 ## Example
 
@@ -81,10 +82,10 @@ function transform(::MyMix, b)
 end
 
 # MyMix will only transform functions which you explicitly allow.
-allow_transform(ctx::MyMix, fn::typeof(SubFoo.h), a...) = true
+allow(ctx::MyMix, fn::typeof(SubFoo.h), a...) = true
 
 # You can greenlight whole modules, if you so desire.
-allow_transform(ctx::MyMix, m::Module) = m == SubFoo
+allow(ctx::MyMix, m::Module) = m == SubFoo
 
 # Debug printing.
 show_after_inference(ctx::MyMix) = false

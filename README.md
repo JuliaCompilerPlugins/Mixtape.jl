@@ -5,12 +5,12 @@
 </p>
 <br>
 
-[![Build Status][build-img]][build-url] [![CodeCov][codecov-img]][codecov-url] [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://femtomc.github.io/CodeInfoTools.jl/dev)
+[![Build Status][build-img]][build-url] [![CodeCov][codecov-img]][codecov-url] [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://femtomc.github.io/Mixtape.jl/dev)
 
-[build-img]: https://github.com/femtomc/CodeInfoTools.jl/workflows/CI/badge.svg
-[build-url]: https://github.com/femtomc/CodeInfoTools.jl/actions
-[codecov-img]: https://codecov.io/github/femtomc/CodeInfoTools.jl/badge.svg?branch=main
-[codecov-url]: https://codecov.io/github/femtomc/CodeInfoTools.jl?branch=main
+[build-img]: https://github.com/femtomc/Mixtape.jl/workflows/CI/badge.svg
+[build-url]: https://github.com/femtomc/Mixtape.jl/actions
+[codecov-img]: https://codecov.io/github/femtomc/Mixtape.jl/badge.svg?branch=main
+[codecov-url]: https://codecov.io/github/femtomc/Mixtape.jl?branch=main
 
 > **Note**: Usage of this package requires `julia >= 1.6`.
 

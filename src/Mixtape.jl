@@ -265,7 +265,7 @@ The user is allowed to greenlight modules:
 allow(::MyCtx, m::Module) == m == SomeModule
 ```
 
-or even specific function types
+or even specific signatures
 
 ```julia
 allow(::MyCtx, fn::typeof(rand), args...) = true

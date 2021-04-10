@@ -30,3 +30,6 @@ end
     Mixtape.@load_call_interface()
     @test call(RecursionMix(), Factorial.f, 10) == 55
 end
+
+using Core.Compiler: NativeInterpreter
+display(Mixtape.CACHE[NativeInterpreter])

@@ -4,7 +4,7 @@ f(x::Int64) = x <= 1 ? 1 : x * f(x - 1)
 
 end
 
-@ctx (false, false, false) struct RecursionMix end
+@ctx (true, true, true) struct RecursionMix end
 allow(ctx::RecursionMix, m::Module) = m == Factorial
 debug(::RecursionMix) = false
 

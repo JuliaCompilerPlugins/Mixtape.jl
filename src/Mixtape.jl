@@ -50,20 +50,19 @@ struct CodeCache
     CodeCache(callback) = new(Dict{MethodInstance,Vector{CodeInstance}}(), callback)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", cc::CodeCache)
-    print(io, "CodeCache: ")
-    for (mi, cis) in cc.dict
-        println(io)
-        print(io, "- ")
-        show(io, mi)
-
-        for ci in cis
-            println(io)
-            print(io, "  - ")
-            print(io, (ci.min_world, ci.max_world))
-        end
-    end
-end
+#function Base.show(io::IO, ::MIME"text/plain", cc::CodeCache)
+#    print(io, "CodeCache: ")
+#    for (mi, cis) in cc.dict
+#        println(io)
+#        print(io, "- ")
+#        show(io, mi.specTypes)
+#        for ci in cis
+#            println(io)
+#            print(io, "  - ")
+#            print(io, (ci.min_world, ci.max_world))
+#        end
+#    end
+#end
 
 function Core.Compiler.setindex!(cache::CodeCache, ci::CodeInstance, mi::MethodInstance)
     if !isdefined(mi, :callbacks)
@@ -90,7 +89,6 @@ const orc = Ref{LLVM.OrcJIT}()
 const tm = Ref{LLVM.TargetMachine}()
 
 struct LLVMCompilerTarget <: AbstractCompilerTarget end
-llvm_machine(target::LLVMCompilerTarget) = tm[]
 struct LLVMCompilerParams <: AbstractCompilerParams
     ctx::Any
 end
@@ -681,11 +679,6 @@ end
 ##### Call interface
 #####
 
-# work around https://github.com/JuliaLang/julia/issues/37778
-__normalize(::Type{Base.RefValue{T}}) where {T} = Ref{T}
-__normalize(::Type{Base.RefArray{T}}) where {T} = Ref{T}
-__normalize(T::DataType) = T
-
 @generated function (entry::Entry{F,RT,TT})(args...) where {F,RT,TT}
     expr = quote
         args = Any[args...]
@@ -717,24 +710,6 @@ macro load_call_interface()
         end
     end
     return esc(expr)
-end
-
-#####
-##### Intrinsics
-#####
-
-abstract type IntrinsicFunction end
-
-function intrinsic_m(name::Symbol)
-    tname = Symbol(name, :_intr)
-    return quote
-        Core.@__doc__ struct $tname <: Mixtape.IntrinsicFunction end
-        Core.@__doc__ const $name = $tname()
-    end
-end
-
-macro intrinsic(ex)
-    return esc(intrinsic_m(ex))
 end
 
 end # module

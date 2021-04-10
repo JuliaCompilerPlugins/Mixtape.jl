@@ -49,7 +49,7 @@ import Mixtape: CompilationContext,
 
 > In other words, you can futz with stuff without refactoring the stuff.
 
-Usage of this package might proceed as follows.
+[The interfaces are well-documented.](https://femtomc.github.io/Mixtape.jl/dev/)
 
 ## Example
 

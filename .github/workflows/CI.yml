@@ -55,7 +55,8 @@ jobs:
           julia --project=docs -e '
             using Pkg
             Pkg.add(url="https://github.com/femtomc/CodeInfoTools.jl")
-            Pkg.add(path="..")
+            Pkg.add(url="https://github.com/femtomc/Mixtape.jl")
+            Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
       - run: julia --project=docs docs/make.jl
         env:

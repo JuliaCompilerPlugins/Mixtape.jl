@@ -9,8 +9,8 @@
 
 [build-img]: https://github.com/femtomc/Mixtape.jl/workflows/CI/badge.svg
 [build-url]: https://github.com/femtomc/Mixtape.jl/actions
-[codecov-img]: https://codecov.io/github/femtomc/Mixtape.jl/badge.svg?branch=main
-[codecov-url]: https://codecov.io/github/femtomc/Mixtape.jl?branch=main
+[codecov-img]: https://codecov.io/github/femtomc/Mixtape.jl/badge.svg?branch=master
+[codecov-url]: https://codecov.io/github/femtomc/Mixtape.jl?branch=master
 
 > **Note**: Usage of this package requires `julia >= 1.6`.
 

@@ -10,13 +10,13 @@ end
 
 end
 
-struct MyMix <: CompilationContext end
+struct StateMix <: CompilationContext end
 
-allow(ctx::MyMix, m::Module, fn, args...) = m == Target
+allow(ctx::StateMix, m::Module, fn, args...) = m == Target
 
-show_after_inference(ctx::MyMix) = false
-show_after_optimization(ctx::MyMix) = false
-debug(ctx::MyMix) = false
+show_after_inference(ctx::StateMix) = false
+show_after_optimization(ctx::StateMix) = false
+debug(ctx::StateMix) = false
 
 mutable struct Recorder
     d::Dict
@@ -31,7 +31,7 @@ function swap(r, e::Expr)
     return Expr(:call, r, e.args[1:end]...)
 end
 
-function transform(::MyMix, b)
+function transform(::StateMix, b)
     pushfirst!(b, Expr(:call, Recorder))
     for (v, st) in b
         e = swap(Core.SSAValue(1), st)
@@ -45,7 +45,7 @@ end
 
     function (r::Recorder)(f::Function, args...)
         args = map(a -> a isa Recorder ? a.ret : a, args)
-        rec = call(MyMix(), f, args...)
+        rec = call(StateMix(), f, args...)
         if rec isa Recorder
             merge!(r.d, rec.d)
             r.d[(f, args...)] = rec.ret
@@ -57,7 +57,7 @@ end
         return r
     end
 
-    rec = call(MyMix(), Target.foo, 5.0)
+    rec = call(StateMix(), Target.foo, 5.0)
     @test rec.d[(Target.baz, 25.0)] == 65.0
     @test rec.d[(Base.:(+), 5.0, 20.0)] == 25.0
     @test rec.d[(Base.:(+), 25, 40.0)] == 65.0

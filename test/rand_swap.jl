@@ -16,8 +16,8 @@ end
 
 g(f) = f()
 
-struct MyMix <: CompilationContext end
-allow(ctx::MyMix, m::Module) = m == TestMixtape
+struct RandMix <: CompilationContext end
+allow(ctx::RandMix, m::Module) = m == TestMixtape
 
 swap(e) = e
 function swap(e::Expr)
@@ -29,7 +29,7 @@ function swap(e::Expr)
     return new
 end
 
-function transform(::MyMix, b)
+function transform(::RandMix, b)
     for (v, st) in b
         replace!(b, v, swap(st))
     end
@@ -37,12 +37,12 @@ function transform(::MyMix, b)
 end
 
 @testset "Rand swap" begin
-    fn = Mixtape.jit(MyMix(), f, Tuple{})
+    fn = Mixtape.jit(RandMix(), f, Tuple{})
     @test fn() == rosenbrock([5, 5])
     Mixtape.@load_call_interface()
-    @test call(MyMix(), f) == rosenbrock([5, 5])
+    @test call(RandMix(), f) == rosenbrock([5, 5])
     @test f() != rosenbrock([5, 5])
-    fn = Mixtape.jit(MyMix(), g, Tuple{typeof(f)})
+    fn = Mixtape.jit(RandMix(), g, Tuple{typeof(f)})
     @test fn() == rosenbrock([5, 5])
-    @test call(MyMix(), g, f) == rosenbrock([5, 5])
+    @test call(RandMix(), g, f) == rosenbrock([5, 5])
 end

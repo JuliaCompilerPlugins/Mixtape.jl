@@ -183,20 +183,20 @@ end
 # our subtype of AbstractInterpreter
 abstract type CompilationContext end
 struct Fallback <: CompilationContext end
-allow(f::C, args...) where {C<:CompilationContext} = false
 show_after_inference(f::CompilationContext) = false
 show_after_optimization(f::CompilationContext) = false
 debug(f::CompilationContext) = false
 transform(ctx::CompilationContext, b) = b
 optimize!(ctx::CompilationContext, ir) = ir
 
+allow(f::C, args...) where {C <: CompilationContext} = false
 function allow(ctx::CompilationContext, mod::Module, fn, args...)
     return allow(ctx, mod) || allow(ctx, fn, args...)
 end
 
 macro ctx(properties, expr)
     @assert(@capture(expr, struct Name_
-                         body__::Any
+                         body__
                      end))
     @assert(properties.head == :tuple)
     properties = properties.args

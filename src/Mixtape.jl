@@ -800,7 +800,6 @@ end
     return expr
 end
 
-function load_call_interface() end
 macro load_call_interface()
     expr = quote
         function cached_call(entry::Mixtape.Entry{F,RT,TT}, args...) where {F,RT,TT}

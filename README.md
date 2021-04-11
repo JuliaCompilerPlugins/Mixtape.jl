@@ -7,15 +7,17 @@
 
 <center>
 
-| **Build Status**                                                                                   | **Coverage**                    |
-|:--------------------------------------------------------------------------------------------------:|:-------------------------------:|
-| [![][gha-1.6-img]][gha-url] [![][gha-nightly-img]][gha-url] | [![][codecov-img]][codecov-url] |
+| **Build Status**                                       | **Coverage**                    | **Documentation** |
+|:------------------------------------------------------:|:-------------------------------:|:-----------------:|
+| [![][gha-1.6-img]][gha-url] [![][gha-nightly-img]][gha-url] | [![][codecov-img]][codecov-url] | [![][dev-docs-img]][dev-docs-url] |
 
-[gha-1.6-img]: https://github.com/femtomc/Mixtape.jl/workflows/ci-1.6/badge.svg
-[gha-nightly-img]: https://github.com/femtomc/Mixtape.jl/workflows/ci-nightly/badge.svg
+[gha-1.6-img]: https://github.com/femtomc/Mixtape.jl/workflows/julia-1.6/badge.svg
+[gha-nightly-img]: https://github.com/femtomc/Mixtape.jl/workflows/julia-nightly/badge.svg
 [gha-url]: https://github.com/femtomc/Mixtape.jl/actions
 [codecov-img]: https://codecov.io/github/femtomc/Mixtape.jl/badge.svg?branch=master
 [codecov-url]: https://codecov.io/github/femtomc/Mixtape.jl?branch=master
+[dev-docs-img]: https://img.shields.io/badge/docs-dev-blue.svg
+[dev-docs-url]: https://femtomc.github.io/Mixtape.jl/dev
 
 </center>
 

@@ -18,6 +18,15 @@ function run_passes(ci::CodeInfo, nargs::Int, sv::OptimizationState)
     return ir
 end
 
+@static if VERSION >= v"1.7.0-DEV.662"
+    using Core.Compiler: finish as _finish
+else
+    function _finish(interp::AbstractInterpreter, opt::OptimizationState,
+                     params::OptimizationParams, ir, @nospecialize(result))
+        return Core.Compiler.finish(opt, params, ir, result)
+    end
+end
+
 function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
                   params::OptimizationParams, @nospecialize(result))
     nargs = Int(opt.nargs) - 1
@@ -42,7 +51,7 @@ function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
             ir = optimize!(interp.ctx, ir)
             verify_ir(ir)
         end
-        ret = Core.Compiler.finish(opt, params, ir, result)
+        ret = _finish(interp, opt, params, ir, result)
         if allow(interp.ctx, mi.def.module, fn, as...) &&
            show_after_optimization(interp.ctx)
             print("@ ($(meth.file), L$(meth.line))\n")
@@ -57,5 +66,5 @@ function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
     catch e
         push!(interp, e)
     end
-    return Core.Compiler.finish(opt, params, ir, result)
+    return _finish(interp, opt, params, ir, result)
 end

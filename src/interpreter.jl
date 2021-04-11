@@ -167,3 +167,6 @@ function Core.Compiler.add_remark!(mxi::MixtapeInterpreter, sv::InferenceState, 
 end
 lock_mi_inference(mxi::MixtapeInterpreter, mi::MethodInstance) = nothing
 unlock_mi_inference(mxi::MixtapeInterpreter, mi::MethodInstance) = nothing
+@static if VERSION >= v"1.7.0-DEV.577"
+    Core.Compiler.verbose_stmt_info(interp::MixtapeInterpreter) = false
+end

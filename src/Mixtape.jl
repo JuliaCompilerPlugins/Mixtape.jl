@@ -8,6 +8,7 @@ using Core.Compiler: MethodInstance, NativeInterpreter, CodeInfo, CodeInstance, 
 import Core.Compiler.abstract_call_known
 using LLVM
 using LLVM.Interop
+using LLVM_full_jll
 
 # Cache
 using Core.Compiler: WorldView

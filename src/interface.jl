@@ -13,12 +13,12 @@ struct Entry{F,RT,TT}
     func::Ptr{Cvoid}
 end
 
-const compiled_cache = Dict{UInt,Any}()
+const jit_compiled_cache = Dict{UInt,Any}()
 
 function jit(ctx::CompilationContext, f::F, tt::TT=Tuple{}) where {F,TT<:Type}
     fspec = FunctionSpec(f, tt, false, nothing) #=name=#
     job = CompilerJob(MixtapeCompilerTarget(), fspec, MixtapeCompilerParams(ctx))
-    return GPUCompiler.cached_compilation(compiled_cache, job, _jit, _link)
+    return GPUCompiler.cached_compilation(jit_compiled_cache, job, _jit, _jitlink)
 end
 
 @doc(
@@ -30,7 +30,7 @@ Compile and specialize a method instance for signature `Tuple{f, tt.parameters..
 Returns a callable "thunk" `Entry{F, RT, TT}` where `RT` is the return type of the instance after inference.
 """, jit)
 
-function _link(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
+function _jitlink(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
     fspec = job.source
     jitted_mod = compile!(orc[], llvm_mod)
     specfunc_addr = addressin(orc[], jitted_mod, specfunc_name)
@@ -44,14 +44,59 @@ function _link(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
 end
 
 function _jit(job::CompilerJob)
-    rt, llvm_specfunc, llvm_func, llvm_mod = codegen(job.params.ctx, job.source.f,
-                                                     job.source.tt)
+    rt, llvm_specfunc, llvm_func, llvm_mod = codegen(job.params.ctx, job.source.f, job.source.tt)
     specfunc_name = LLVM.name(llvm_specfunc)
     func_name = LLVM.name(llvm_func)
     linkage!(llvm_func, LLVM.API.LLVMExternalLinkage)
     linkage!(llvm_specfunc, LLVM.API.LLVMExternalLinkage)
     run_pipeline!(llvm_mod)
     return (rt, llvm_mod, func_name, specfunc_name)
+end
+
+#####
+##### Experimental: support for AOT compilation
+#####
+
+# TODO: When https://github.com/JuliaGPU/GPUCompiler.jl/compare/jps/static-compile is merged -- refactor.
+
+module MixtapeRuntime
+    # dummy methods
+    signal_exception() = return
+    malloc(sz) = C_NULL
+    report_oom(sz) = return
+    report_exception(ex) = return
+    report_exception_name(ex) = return
+    report_exception_frame(idx, func, file, line) = return
+
+    # for validation
+    sin(x) = Base.sin(x)
+end
+
+import GPUCompiler: runtime_module
+GPUCompiler.runtime_module(::CompilerJob{<:Any, MixtapeCompilerParams}) = MixtapeRuntime
+
+const linker = Sys.isunix() ? "ld.lld" : Sys.isapple() ? "ld64.lld" : "lld-link"
+
+function mixtape_job(ctx, @nospecialize(func), tt;
+               cpu::String = (LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName()),
+               features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures()),
+               name = GPUCompiler.safe_name(repr(func)))
+    source = FunctionSpec(func, tt, false)
+    target = GPUCompiler.NativeCompilerTarget(cpu=cpu, features=features)
+    params = MixtapeCompilerParams(ctx)
+    return CompilerJob(target, source, params)
+end
+
+function aot(ctx::CompilationContext, f::F, tt::TT=Tuple{}; 
+        path = tempname()) where {F, TT <: Type}
+    open(path, "w") do io
+        job = mixtape_job(ctx, f, tt)
+        rt, _, _, mod = codegen(job.params.ctx, job.source.f, job.source.tt)
+        GPUCompiler.finish_module!(job, mod)
+        tm = GPUCompiler.llvm_machine(job.target)
+        LLVM.emit(tm, mod, LLVM.API.LLVMObjectFile, path)
+    end
+    return (path, name)
 end
 
 #####

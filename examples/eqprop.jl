@@ -1,20 +1,14 @@
 module EqualitySaturation
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow, show_after_inference,
-                show_after_optimization, debug, @load_call_interface
 using MacroTools
 using InteractiveUtils
 using BenchmarkTools
 
-f(x) = (x - x)
+f(x) = (x - x) + (10 * 15)
 
-struct MyMix <: CompilationContext end
-
+@ctx (true, true, false) struct MyMix end
 allow(ctx::MyMix, m::Module) = m == EqualitySaturation
-show_after_inference(ctx::MyMix) = true
-show_after_optimization(ctx::MyMix) = true
-debug(ctx::MyMix) = false
 
 swap(e) = e
 function swap(e::Expr)
@@ -27,9 +21,6 @@ function swap(e::Expr)
 end
 
 function transform(::MyMix, b)
-    #for (v, st) in b
-    #    replace!(b, v, swap(st))
-    #end
     return b
 end
 

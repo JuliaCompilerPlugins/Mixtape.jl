@@ -9,7 +9,7 @@ f(x::Int64) = x <= 1 ? 1 : x * f(x - 1)
 
 end
 
-@ctx (true, false, true) struct MyMix end
+@ctx (false, false, false) struct MyMix end
 allow(ctx::MyMix, m::Module) = m == Factorial
 
 swap(e) = e
@@ -27,6 +27,11 @@ function transform(::MyMix, b)
         replace!(b, v, swap(st))
     end
     return b
+end
+
+function optimize!(::MyMix, ir)
+    display(ir)
+    ir
 end
 
 Mixtape.@load_call_interface()

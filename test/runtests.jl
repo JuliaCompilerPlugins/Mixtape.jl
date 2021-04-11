@@ -10,5 +10,6 @@ include("dynamic_overlay.jl")
 include("rand_swap.jl")
 include("insert_state.jl")
 include("recursion.jl")
+include("invalidation.jl")
 
 end # module

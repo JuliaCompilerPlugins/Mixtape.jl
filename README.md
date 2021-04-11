@@ -5,8 +5,6 @@
 </p>
 <br>
 
-<center>
-
 | **Build Status**                                       | **Coverage**                    | **Documentation** |
 |:------------------------------------------------------:|:-------------------------------:|:-----------------:|
 | [![][gha-1.6-img]][gha-url] [![][gha-nightly-img]][gha-url] | [![][codecov-img]][codecov-url] | [![][dev-docs-img]][dev-docs-url] |
@@ -18,8 +16,6 @@
 [codecov-url]: https://codecov.io/github/femtomc/Mixtape.jl?branch=master
 [dev-docs-img]: https://img.shields.io/badge/docs-dev-blue.svg
 [dev-docs-url]: https://femtomc.github.io/Mixtape.jl/dev
-
-</center>
 
 > **Note**: Usage of this package requires `julia >= 1.6`.
 

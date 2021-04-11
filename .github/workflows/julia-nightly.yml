@@ -1,4 +1,4 @@
-name: ci-nightly
+name: julia-nightly
 on:
   push:
     branches:

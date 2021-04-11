@@ -1,4 +1,4 @@
-name: ci-1.6
+name: julia-1.6
 on:
   push:
     branches:

@@ -2,7 +2,6 @@ module HandleInvoke
 
 using Mixtape
 using MacroTools
-using InteractiveUtils
 using BenchmarkTools
 
 @noinline foo(x) = x^5

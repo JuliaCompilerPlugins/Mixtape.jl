@@ -2,7 +2,6 @@ module EqualitySaturation
 
 using Mixtape
 using MacroTools
-using InteractiveUtils
 using BenchmarkTools
 
 f(x) = (x - x) + (10 * 15)

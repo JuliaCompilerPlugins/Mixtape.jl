@@ -4,7 +4,6 @@ using Mixtape
 import Mixtape: CompilationContext, transform, optimize!, allow, show_after_inference,
                 show_after_optimization, debug, @load_call_interface
 using MacroTools
-using InteractiveUtils
 using BenchmarkTools
 
 # This shows an example where we recursively modify method calls to record state. Very monadic, dare I say :)

@@ -4,7 +4,6 @@ using Mixtape
 import Mixtape: CompilationContext, transform, allow, show_after_inference,
                 show_after_optimization, debug, @load_call_interface
 using MacroTools
-using InteractiveUtils
 using BenchmarkTools
 
 struct Foo

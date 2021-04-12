@@ -1,0 +1,26 @@
+name: julia-1.6-docs
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+jobs:
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.6'
+      - run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.add(url="https://github.com/femtomc/CodeInfoTools.jl")
+            Pkg.add(url="https://github.com/femtomc/Mixtape.jl")
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+      - run: julia --project=docs docs/make.jl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}

@@ -44,7 +44,7 @@ function transform(::MyMix, b)
     pushfirst!(b, Expr(:call, Recorder))
     for (v, st) in b
         e = swap(Core.SSAValue(1), st)
-        v == 1 || replace!(b, v, e)
+        v == Core.SSAValue(1) || replace!(b, v, e)
     end
     return b
 end

@@ -7,14 +7,14 @@ function f(x)
     return g(2)
 end
 
-struct DynamicMix <: CompilationContext end
-
+@ctx (false, false, false) struct DynamicMix end
 allow(ctx::DynamicMix, m::Module) = m == TestMixtape
 
 swap(e) = e
 function swap(e::Expr)
     new = MacroTools.postwalk(e) do s
-        isexpr(s, :call) || return s
+        s isa Expr || return s
+        s.head == :call || return s
         s.args[1] == Base.literal_pow || return s
         return Expr(:call, apply, Base.:(*), s.args[3:end]...)
     end

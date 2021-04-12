@@ -1,8 +1,6 @@
 module DynamicOverlay
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow, show_after_inference,
-                show_after_optimization, debug, @load_call_interface
 using MacroTools
 using BenchmarkTools
 
@@ -15,24 +13,23 @@ function f(x)
     return g(2)
 end
 
-struct MyMix <: CompilationContext end
-
+@ctx (false, false, true) struct MyMix end
 allow(ctx::MyMix, m::Module) = m == DynamicOverlay
-show_after_inference(ctx::MyMix) = false
-show_after_optimization(ctx::MyMix) = false
-debug(ctx::MyMix) = false
 
 swap(e) = e
 function swap(e::Expr)
+    display(e)
     new = MacroTools.postwalk(e) do s
         isexpr(s, :call) || return s
         s.args[1] == Base.literal_pow || return s
         return Expr(:call, apply, Base.:(*), s.args[3:end]...)
     end
+    display(e)
     return new
 end
 
 function transform(::MyMix, b)
+    display(b)
     for (v, st) in b
         replace!(b, v, swap(st))
     end

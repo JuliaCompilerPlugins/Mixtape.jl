@@ -95,7 +95,6 @@ function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeIn
             if allow_tracing(interp.ctx)
                 world = interp.inner.world
                 wvc = WorldView(get_cache(TracingInterpreter), world, world)
-                display(get_cache(TracingInterpreter))
                 _, new = infer(wvc, mi, TracingInterpreter(interp))
             end
             b = CodeInfoTools.Builder(new, length(result.argtypes[2:end]))

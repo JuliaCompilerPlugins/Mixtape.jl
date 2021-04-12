@@ -1,9 +1,9 @@
 #include <iostream>
 
 extern "C" {
-    int factorial(int);
+    int fact(int);
 }
 
 int main() {
-    std::cout << factorial(10) << std::endl;
+    std::cout << fact(10) << std::endl;
 }

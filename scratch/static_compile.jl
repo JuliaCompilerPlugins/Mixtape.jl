@@ -3,16 +3,12 @@ module StaticCompile
 using Mixtape
 using MacroTools
 
-module Factorial
-
-Base.@ccallable Ptr{Cvoid} function f(x::Int64)
-    x <= 1 ? 1 : x * f(x - 1)
-end
-
+Base.@ccallable Ptr{Cvoid} function fact(x::Int64)
+    return x <= 1 ? 1 : x * f(x - 1)
 end
 
 @ctx (true, false, false) struct MyMix end
-allow(ctx::MyMix, m::Module) = m == Factorial
+allow(ctx::MyMix, m::Module) = m == StaticCompile
 
 swap(e) = e
 function swap(e::Expr)
@@ -34,7 +30,7 @@ end
 optimize!(::MyMix, ir) = ir
 
 p = "libf"
-Mixtape.aot(MyMix(), Factorial.f, Tuple{Int}; path = p)
+Mixtape.aot(MyMix(), fact, Tuple{Int}; path = p)
 #rm(p)
 
 end # module

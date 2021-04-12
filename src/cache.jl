@@ -36,8 +36,9 @@ function Core.Compiler.setindex!(cache::CodeCache, ci::CodeInstance, mi::MethodI
     return push!(cis, ci)
 end
 
-const CACHE = Dict{DataType,CodeCache}()
+const CACHE = Dict{Any,CodeCache}()
 get_cache(ai::DataType) = CACHE[ai]
+get_cache(ai::Type{<:AbstractInterpreter}) = CACHE[ai]
 
 function invalidate(cache::CodeCache, replaced::MethodInstance, max_world, depth)
     cis = get(cache.dict, replaced, nothing)

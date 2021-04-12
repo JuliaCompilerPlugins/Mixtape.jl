@@ -38,7 +38,7 @@ resolve(gr::GlobalRef) = getproperty(gr.mod, gr.name)
 resolve(c::Core.Const) = c.val
 
 # Exports.
-export CompilationContext, allow, transform, optimize!, show_after_inference,
+export CompilationContext, allow, allow_tracing, transform, optimize!, show_after_inference,
        show_after_optimization, debug, @ctx, @intrinsic
 
 export widen_invokes
@@ -46,11 +46,13 @@ export widen_invokes
 include("cache.jl")
 include("world.jl")
 include("utility_transforms.jl")
+include("context.jl")
 include("interpreter.jl")
+include("tracer.jl")
 include("codegen.jl")
-include("optimize.jl")
 include("llvmopt.jl")
 include("interface.jl")
+include("reflection.jl")
 include("init.jl")
 
 end # module

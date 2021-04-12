@@ -6,6 +6,10 @@ function code_cache(mxi::MixtapeInterpreter)
     return WorldView(get_cache(typeof(mxi.inner)), get_world_counter(mxi))
 end
 
+function code_cache(tr::TracingInterpreter)
+    return WorldView(get_cache(TracingInterpreter), get_world_counter(tr))
+end
+
 function cpu_invalidate(replaced, max_world)
     cache = get_cache(NativeInterpreter)
     invalidate(cache, replaced, max_world, 0)
@@ -48,7 +52,7 @@ function infer(wvc, mi, interp)
     if ci !== nothing && ci.inferred === nothing
         ci.inferred = src
     end
-    return ret
+    return ret, src
 end
 
 struct InvokeException <: Exception
@@ -87,13 +91,21 @@ function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeIn
             print("| beg (inf): $(meth.module).$(fn)\n")
         end
         if allow(interp.ctx, meth.module, fn, as...)
-            b = CodeInfoTools.Builder(src, length(result.argtypes[2:end]))
+            new = src
+            if allow_tracing(interp.ctx)
+                world = interp.inner.world
+                wvc = WorldView(get_cache(TracingInterpreter), world, world)
+                display(get_cache(TracingInterpreter))
+                _, new = infer(wvc, mi, TracingInterpreter(interp))
+            end
+            b = CodeInfoTools.Builder(new, length(result.argtypes[2:end]))
             b = transform(interp.ctx, b)
             e = detect_invoke(b, result.linfo)
             if e != nothing
                 push!(interp, e)
             end
-            src = finish(b)
+            new = finish(b)
+            src = CodeInfoTools.clean!(new)
         end
     catch e
         push!(interp, e)
@@ -105,11 +117,8 @@ end
 
 function cpu_compile(ctx, mi, world)
     params = Base.CodegenParams(; track_allocations=false, code_coverage=false,
-                                prefer_specsig=true,
-                                lookup=@cfunction(cpu_cache_lookup, Any, (Any, UInt, UInt)))
-
-    # generate IR
-    # TODO: Instead of extern policy integrate with Orc JIT
+        prefer_specsig=true,
+        lookup=@cfunction(cpu_cache_lookup, Any, (Any, UInt, UInt)))
 
     # populate the cache
     if cpu_cache_lookup(mi, world, world) === nothing
@@ -120,11 +129,11 @@ function cpu_compile(ctx, mi, world)
     rt = Any
 
     native_code = ccall(:jl_create_native, Ptr{Cvoid},
-                        (Vector{Core.MethodInstance}, Base.CodegenParams, Cint), [mi],
-                        params, 1) #=extern policy=#
+        (Vector{Core.MethodInstance}, Base.CodegenParams, Cint), [mi],
+        params, 1) #=extern policy=#
     @assert native_code != C_NULL
     llvm_mod_ref = ccall(:jl_get_llvm_module, LLVM.API.LLVMModuleRef, (Ptr{Cvoid},),
-                         native_code)
+        native_code)
     @assert llvm_mod_ref != C_NULL
     llvm_mod = LLVM.Module(llvm_mod_ref)
 
@@ -135,17 +144,17 @@ function cpu_compile(ctx, mi, world)
     llvm_func_idx = Ref{Int32}(-1)
     llvm_specfunc_idx = Ref{Int32}(-1)
     ccall(:jl_get_function_id, Nothing, (Ptr{Cvoid}, Any, Ptr{Int32}, Ptr{Int32}),
-          native_code, code, llvm_func_idx, llvm_specfunc_idx)
+        native_code, code, llvm_func_idx, llvm_specfunc_idx)
     @assert llvm_func_idx[] != -1
     @assert llvm_specfunc_idx[] != -1
 
     # get the top-level function
     llvm_func_ref = ccall(:jl_get_llvm_function, LLVM.API.LLVMValueRef,
-                          (Ptr{Cvoid}, UInt32), native_code, llvm_func_idx[] - 1)
+        (Ptr{Cvoid}, UInt32), native_code, llvm_func_idx[] - 1)
     @assert llvm_func_ref != C_NULL
     llvm_func = LLVM.Function(llvm_func_ref)
     llvm_specfunc_ref = ccall(:jl_get_llvm_function, LLVM.API.LLVMValueRef,
-                              (Ptr{Cvoid}, UInt32), native_code, llvm_specfunc_idx[] - 1)
+        (Ptr{Cvoid}, UInt32), native_code, llvm_specfunc_idx[] - 1)
     @assert llvm_specfunc_ref != C_NULL
     llvm_specfunc = LLVM.Function(llvm_specfunc_ref)
 
@@ -157,13 +166,13 @@ function method_instance(@nospecialize(f), @nospecialize(tt), world)
     meth = which(f, tt)
     sig = Base.signature_type(f, tt)::Type
     (ti, env) = ccall(:jl_type_intersection_with_env, Any, (Any, Any), sig,
-                      meth.sig)::Core.SimpleVector
+        meth.sig)::Core.SimpleVector
     meth = Base.func_for_method_checked(meth, ti, env)
     return ccall(:jl_specializations_get_linfo, Ref{Core.MethodInstance},
-                 (Any, Any, Any, UInt), meth, ti, env, world)
+        (Any, Any, Any, UInt), meth, ti, env, world)
 end
 
 function codegen(ctx::CompilationContext, @nospecialize(f), @nospecialize(tt);
-                 world=Base.get_world_counter())
+        world=Base.get_world_counter())
     return cpu_compile(ctx, method_instance(f, tt, world), world)
 end

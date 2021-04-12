@@ -8,6 +8,8 @@ CurrentModule = Mixtape
 
 ```@docs
 CompilationContext
+allow_tracing
+trace!
 allow
 transform
 optimize!

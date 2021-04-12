@@ -20,8 +20,7 @@
 > **Note**: Usage of this package requires `julia >= 1.6`.
 
 ```
-] add https://github.com/femtomc/CodeInfoTools.jl
-] add https://github.com/femtomc/Mixtape.jl
+] add Mixtape
 ```
 
 ---

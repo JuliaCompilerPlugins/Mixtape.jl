@@ -5,11 +5,13 @@ using MacroTools
 
 module Factorial
 
-f(x::Int64) = x <= 1 ? 1 : x * f(x - 1)
+Base.@ccallable Ptr{Cvoid} function f(x::Int64)
+    x <= 1 ? 1 : x * f(x - 1)
+end
 
 end
 
-@ctx (false, false, true) struct MyMix end
+@ctx (true, false, false) struct MyMix end
 allow(ctx::MyMix, m::Module) = m == Factorial
 
 swap(e) = e
@@ -31,7 +33,7 @@ end
 
 optimize!(::MyMix, ir) = ir
 
-p = "scratch/libf"
+p = "libf"
 Mixtape.aot(MyMix(), Factorial.f, Tuple{Int}; path = p)
 #rm(p)
 

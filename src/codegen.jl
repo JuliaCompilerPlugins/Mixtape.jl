@@ -77,11 +77,7 @@ function detect_invoke(b, linfo)
     return nothing
 end
 
-# Replace usage sited of `retrieve_code_info`, OptimizationState is one such, but in all interesting use-cases
-# it is derived from an InferenceState. There is a third one in `typeinf_ext` in case the module forbids inference.
-function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeInterpreter)
-    src = retrieve_code_info(result.linfo)
-    mi = result.linfo
+function mixtape_hook!(interp, result, mi, src)
     meth = mi.def
     try
         fn = resolve(GlobalRef(meth.module, meth.name))
@@ -109,6 +105,15 @@ function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeIn
     catch e
         push!(interp, e)
     end
+    return src
+end
+
+# Replace usage sited of `retrieve_code_info`, OptimizationState is one such, but in all interesting use-cases
+# it is derived from an InferenceState. There is a third one in `typeinf_ext` in case the module forbids inference.
+function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeInterpreter)
+    src = retrieve_code_info(result.linfo)
+    mi = result.linfo
+    src = mixtape_hook!(interp, result, mi, src)
     src === nothing && return nothing
     validate_code_in_debug_mode(result.linfo, src, "lowered")
     return InferenceState(result, src, cached, interp)

@@ -88,14 +88,13 @@ function mixtape_job(ctx, @nospecialize(func), tt;
 end
 
 function aot(ctx::CompilationContext, f::F, tt::TT=Tuple{}; 
-        path = tempname()) where {F, TT <: Type}
-    open(path, "w") do io
-        job = mixtape_job(ctx, f, tt)
-        rt, _, _, mod = codegen(job.params.ctx, job.source.f, job.source.tt)
-        GPUCompiler.finish_module!(job, mod)
-        tm = GPUCompiler.llvm_machine(job.target)
-        LLVM.emit(tm, mod, LLVM.API.LLVMObjectFile, path)
-    end
+    path = tempname()) where {F, TT <: Type}
+    job = mixtape_job(ctx, f, tt)
+    rt, _, _, mod = codegen(job.params.ctx, job.source.f, job.source.tt)
+    GPUCompiler.finish_module!(job, mod)
+    tm = GPUCompiler.llvm_machine(job.target)
+    LLVM.emit(tm, mod, LLVM.API.LLVMObjectFile, path * ".o")
+    LLVM.emit(tm, mod, LLVM.API.LLVMAssemblyFile, path * ".s")
     return (path, name)
 end
 

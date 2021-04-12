@@ -31,8 +31,8 @@ end
 
 optimize!(::MyMix, ir) = ir
 
-p = "libf.o"
+p = "scratch/libf"
 Mixtape.aot(MyMix(), Factorial.f, Tuple{Int}; path = p)
-rm(p)
+#rm(p)
 
 end # module

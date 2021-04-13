@@ -41,8 +41,6 @@ In many respects, it is similar to [Cassette.jl](https://github.com/JuliaLabs/Ca
 using Mixtape
 using Mixtape: jit, @load_call_interface
 import Mixtape: CompilationContext, 
-                allow_tracing,
-                trace!,
                 allow, 
                 transform, 
                 optimize!,
@@ -64,8 +62,8 @@ This package pairs well with [CodeInfoTools.jl](https://github.com/femtomc/CodeI
 Now easy as 1, 2, 3!
 
 1. [Start simple!](https://github.com/femtomc/Mixtape.jl/blob/master/examples/simple.jl)
-2. [Be mindful of state.](https://github.com/femtomc/Mixtape.jl/blob/master/examples/insert_state.jl)
-3. [Have you considered that it is interpreters all the way down?](https://github.com/femtomc/Mixtape.jl/blob/master/examples/tracing.jl)
+2. [Recursive musings...](https://github.com/femtomc/Mixtape.jl/blob/master/examples/recursion.jl)
+3. [Have you considered that it is interpreters all the way down?](https://github.com/femtomc/Mixtape.jl/blob/master/examples/cassette.jl)
 
 ## Package contribution
 

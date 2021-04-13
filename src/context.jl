@@ -96,26 +96,54 @@ allow(::MyCtx, fn::typeof(rand), args...) = true
 ```
 """, allow)
 
-macro ctx(properties, expr)
-    @assert(@capture(expr, struct Name_
-                         body__
-                     end))
-    @assert(properties.head == :tuple)
+function _immutable(properties, expr)
     properties = properties.args
+    @assert(@capture(expr, struct Name_ body__ end))
     ex = Expr(:block,
               quote
                   import Mixtape: allow, show_after_inference, show_after_optimization,
                                   debug, transform, optimize!
-              end, quote
-                  struct $Name <: Mixtape.CompilationContext
-                      $(body...)
-                  end
-              end, quote
+              end, 
+              Expr(:struct, false, 
+                   Expr(:(<:), Name, Mixtape.CompilationContext), 
+                   Expr(:block, body...)
+                  ),
+              quote
                   show_after_inference(::$Name) = $(properties[1])
                   show_after_optimization(::$Name) = $(properties[2])
                   debug(::$Name) = $(properties[3])
               end)
-    ex = postwalk(rmlines ∘ unblock, ex)
+    return ex
+end
+
+function _mutable(properties, expr)
+    properties = properties.args
+    @assert(@capture(expr, mutable struct Name_ body__ end))
+    ex = Expr(:block,
+              quote
+                  import Mixtape: allow, show_after_inference, show_after_optimization,
+                                  debug, transform, optimize!
+                  end, 
+              Expr(:struct, true, 
+                   Expr(:(<:), Name, Mixtape.CompilationContext), 
+                   Expr(:block, body...)
+                  ),
+              quote
+                  show_after_inference(::$Name) = $(properties[1])
+                  show_after_optimization(::$Name) = $(properties[2])
+                  debug(::$Name) = $(properties[3])
+              end)
+    return ex
+end
+
+macro ctx(properties, expr)
+    @assert(properties.head == :tuple)
+    if @capture(expr, struct Name_ body__ end)
+        ex = _immutable(properties, expr)
+    elseif @capture(expr, mutable struct Name_ body__ end)
+        ex = _mutable(properties, expr)
+    end
+    ex = postwalk(rmlines, ex)
     return esc(ex)
 end
 

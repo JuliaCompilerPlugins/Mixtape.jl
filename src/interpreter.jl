@@ -2,7 +2,8 @@
 ##### MixtapeInterpreter
 #####
 
-struct MixtapeInterpreter{Ctx<:CompilationContext,Inner<:AbstractInterpreter} <:
+struct MixtapeInterpreter{Ctx<:CompilationContext,
+                          Inner<:AbstractInterpreter} <:
        AbstractInterpreter
     ctx::Ctx
     inner::Inner

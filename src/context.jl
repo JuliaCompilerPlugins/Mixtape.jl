@@ -10,7 +10,7 @@ abstract type CompilationContext end
 """
     abstract type CompilationContext end
 
-Parametrize the Mixtape pipeline by inheriting from `CompilationContext`. Similar to the context objects in [Cassette.jl](https://julia.mit.edu/Cassette.jl/stable/contextualdispatch.html). By using the interface methods `show_after_inference`, `show_after_optimization`, `debug`, `transform`, and `optimize!` -- the user can control different parts of the compilation pipeline.
+Parametrize the Mixtape pipeline by inheriting from `CompilationContext`. Similar to the context objects in [Cassette.jl](https://julia.mit.edu/Cassette.jl/stable/contextualdispatch.html). By using the interface methods `show_after_inference`, `show_after_optimization`, `debug`, `transform`, `preopt!`, and `postopt!` -- the user can control different parts of the compilation pipeline.
 """, CompilationContext)
 
 show_after_inference(ctx::CompilationContext) = false
@@ -28,7 +28,7 @@ show_after_optimization(ctx::CompilationContext) = false
 """
     show_after_optimization(ctx::CompilationContext)::Bool
 
-Turns on a pipeline feature which will dump out `CodeInfo` after optimization (including the user-defined `optimize!` transformation, if applied).
+Turns on a pipeline feature which will dump out `CodeInfo` after optimization (including the user-defined `preopt!` and `postopt!` transformations, if applied).
 """, show_after_optimization)
 
 debug(ctx::CompilationContext) = false
@@ -63,14 +63,23 @@ end
 but more advanced formats are possible. For further utilities, please see [CodeInfoTools.jl](https://github.com/femtomc/CodeInfoTools.jl).
 """, transform)
 
-optimize!(ctx::CompilationContext, ir) = ir
+preopt!(ctx::CompilationContext, ir) = ir
 
 @doc(
 """
-    optimize!(ctx::CompilationContext, ir::Core.Compiler.IRCode)::Core.Compiler.IRCode
+    preopt!(ctx::CompilationContext, ir::Core.Compiler.IRCode)::Core.Compiler.IRCode
 
-User-defined transform which operates on inferred `Core.Compiler.IRCode`. This transform operates after a set of optimizations which mimic Julia's pipeline.
-""", optimize!)
+User-defined transform which operates on inferred `Core.Compiler.IRCode`. This transform operates **before** a set of optimizations which mimic Julia's pipeline.
+""", preopt!)
+
+postopt!(ctx::CompilationContext, ir) = ir
+
+@doc(
+"""
+    postopt!(ctx::CompilationContext, ir::Core.Compiler.IRCode)::Core.Compiler.IRCode
+
+User-defined transform which operates on inferred `Core.Compiler.IRCode`. This transform operates **after** a set of optimizations which mimic Julia's pipeline.
+""", postopt!)
 
 allow(f::C, args...) where {C <: CompilationContext} = false
 function allow(ctx::CompilationContext, mod::Module, fn, args...)
@@ -81,7 +90,7 @@ end
 """
     allow(f::CompilationContext, args...)::Bool
 
-Determines whether a user-defined `transform` or `optimize!` is allowed to look at a lowered `CodeInfoTools.Builder` object or `Core.Compiler.IRCode`.
+Determines whether the user-defined `transform`, `preopt!`, and `postopt!` are allowed to look at a lowered `CodeInfoTools.Builder` object or `Core.Compiler.IRCode`.
 
 The user is allowed to greenlight modules:
 
@@ -102,7 +111,7 @@ function _immutable(properties, expr)
     ex = Expr(:block,
               quote
                   import Mixtape: allow, show_after_inference, show_after_optimization,
-                                  debug, transform, optimize!
+                                  debug, transform, preopt!, postopt!
               end, 
               Expr(:struct, false, 
                    Expr(:(<:), Name, Mixtape.CompilationContext), 
@@ -122,7 +131,7 @@ function _mutable(properties, expr)
     ex = Expr(:block,
               quote
                   import Mixtape: allow, show_after_inference, show_after_optimization,
-                                  debug, transform, optimize!
+                                  debug, transform, preopt!, postopt!
                   end, 
               Expr(:struct, true, 
                    Expr(:(<:), Name, Mixtape.CompilationContext), 

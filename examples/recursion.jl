@@ -29,7 +29,7 @@ function transform(::MyMix, b)
     return b
 end
 
-function optimize!(::MyMix, ir)
+function postopt!(::MyMix, ir)
     display(ir)
     ir
 end

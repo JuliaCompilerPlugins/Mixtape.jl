@@ -18,7 +18,7 @@ end
 end
 
 using Mixtape
-import Mixtape: CompilationContext, transform, optimize!, allow, show_after_inference,
+import Mixtape: CompilationContext, transform, allow, show_after_inference,
                 show_after_optimization, debug
 using MacroTools
 
@@ -42,10 +42,6 @@ function transform(::MyMix, b)
         replace!(b, v, swap(st))
     end
     return b
-end
-
-function optimize!(::MyMix, ir)
-    return ir
 end
 
 # MyMix will only transform functions which you explicitly allow.

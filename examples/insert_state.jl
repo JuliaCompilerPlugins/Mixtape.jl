@@ -1,7 +1,7 @@
 module InsertState
 
 using Mixtape
-import Mixtape: CompilationContext, transform, optimize!, allow, show_after_inference,
+import Mixtape: CompilationContext, transform, allow, show_after_inference,
                 show_after_optimization, debug, @load_call_interface
 using MacroTools
 using BenchmarkTools

@@ -8,7 +8,7 @@ f(x::Number, y) = sin(x + 1) + (sin(3y) - 1);
 allow(ctx::MyMix, m::Module) = m == Tracing
 
 using Core.Compiler: Const, is_pure_intrinsic_infer, intrinsic_nothrow, anymap, quoted
-function optimize!(::MyMix, ir)
+function postopt!(::MyMix, ir)
     for i in 1 : length(ir.stmts)
         stmt = ir.stmts[i][:inst]
         if stmt isa Expr && stmt.head === :call
@@ -42,8 +42,8 @@ function optimize!(::MyMix, ir)
 end
 
 λ = x -> f(x, 3.0)
-display(Mixtape.@code_inferred MyMix() λ(Float64))
 entry = Mixtape.jit(MyMix(), λ, Tuple{Float64})
+display(Mixtape.@code_inferred MyMix() λ(Float64))
 display(entry(5.0))
 
 end # module

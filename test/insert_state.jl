@@ -40,7 +40,7 @@ function transform(::StateMix, b)
     return b
 end
 
-function optimize!(::StateMix, ir)
+function postopt!(::StateMix, ir)
     return ir
 end
 

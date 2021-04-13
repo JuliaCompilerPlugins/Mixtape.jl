@@ -1,6 +1,6 @@
 module Mixtape
 
-using MacroTools: isexpr, @capture, rmlines, unblock, postwalk
+using MacroTools: @capture, rmlines, postwalk
 using CodeInfoTools
 using Core.Compiler
 using Core.Compiler: MethodInstance, NativeInterpreter, CodeInfo, CodeInstance, WorldView,

@@ -87,7 +87,7 @@ end
 
 # Optimize decrements the stacklevel. 
 # This honestly doesn't really matter, but it is good form.
-function optimize!(mix::Mix, ir)
+function postopt!(mix::Mix, ir)
     mix.stacklevel -= 1
     return ir
 end

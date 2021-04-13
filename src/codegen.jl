@@ -51,64 +51,6 @@ function infer(wvc, mi, interp::MixtapeInterpreter)
     return ret
 end
 
-struct InvokeException <: Exception
-    name::Any
-    mod::Any
-    file::Any
-    line::Any
-end
-function Base.show(io::IO, ie::InvokeException)
-    print("@ ($(ie.file), L$(ie.line))\n")
-    return print("| (Found call to invoke): $(ie.mod).$(ie.name)\n")
-end
-
-function detect_invoke(b, linfo)
-    meth = linfo.def
-    for (v, st) in b
-        st isa Expr || continue
-        st.head == :call || continue
-        st.args[1] == invoke || continue
-        return InvokeException(meth.name, meth.module, meth.file, meth.line)
-    end
-    return nothing
-end
-
-function mixtape_hook!(interp, result, mi, src)
-    meth = mi.def
-    try
-        fn = resolve(GlobalRef(meth.module, meth.name))
-        as = map(resolve, result.argtypes[2:end])
-        if debug(interp.ctx)
-            print("@ ($(meth.file), L$(meth.line))\n")
-            print("| beg (inf): $(meth.module).$(fn)\n")
-        end
-        if allow(interp.ctx, meth.module, fn, as...)
-            b = CodeInfoTools.Builder(src, length(result.argtypes[2:end]))
-            b = transform(interp.ctx, b)
-            e = detect_invoke(b, result.linfo)
-            if e != nothing
-                push!(interp, e)
-            end
-            src = finish(b)
-            src = CodeInfoTools.clean!(src)
-        end
-    catch e
-        push!(interp, e)
-    end
-    return src
-end
-
-# Replace usage sited of `retrieve_code_info`, OptimizationState is one such, but in all interesting use-cases
-# it is derived from an InferenceState. There is a third one in `typeinf_ext` in case the module forbids inference.
-function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeInterpreter)
-    src = retrieve_code_info(result.linfo)
-    mi = result.linfo
-    src = mixtape_hook!(interp, result, mi, src)
-    src === nothing && return nothing
-    validate_code_in_debug_mode(result.linfo, src, "lowered")
-    return InferenceState(result, src, cached, interp)
-end
-
 function cpu_compile(ctx, mi, world)
     params = Base.CodegenParams(; track_allocations=false, code_coverage=false,
         prefer_specsig=true,

@@ -43,7 +43,8 @@ using Mixtape: jit, @load_call_interface
 import Mixtape: CompilationContext, 
                 allow, 
                 transform, 
-                optimize!,
+                preopt!,
+                postopt!,
                 show_after_inference,
                 show_after_optimization, 
                 debug

@@ -11,7 +11,6 @@ end
 
 @ctx (false, false, false) struct MyMix end
 allow(ctx::MyMix, m::Module) = m == Factorial
-allow_tracing(ctx::MyMix) = true
 
 swap(e) = e
 function swap(e::Expr)
@@ -33,6 +32,8 @@ end
 optimize!(::MyMix, ir) = ir
 trace!(::MyMix, ir) = (display(ir); ir)
 
+allow_tracing(ctx::MyMix) = true
 entry = Mixtape.jit(MyMix(), Factorial.f, Tuple{Int})
+display(entry(5))
 
 end # module

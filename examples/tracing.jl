@@ -22,6 +22,7 @@ function swap(e::Expr)
     return new
 end
 
+# Secondary interpreter -- gets typed CodeInfo from the first.
 function transform(::MyMix, b)
     for (v, st) in b
         replace!(b, v, swap(st))
@@ -29,10 +30,15 @@ function transform(::MyMix, b)
     return b
 end
 
+# "Low-level" optimizer -- after the secondary interpreter.
 optimize!(::MyMix, ir) = ir
+
+# "High-level"  optimizer -- first does type inference, then gets to see the IR before feeding it to the second interpreter.
 trace!(::MyMix, ir) = (display(ir); ir)
 
+# Allow the high-level interpreter into the pipeline.
 allow_tracing(ctx::MyMix) = true
+
 entry = Mixtape.jit(MyMix(), Factorial.f, Tuple{Int})
 display(entry(5))
 

@@ -11,6 +11,8 @@ include("rand_swap.jl")
 include("insert_state.jl")
 include("recursion.jl")
 include("invalidation.jl")
+include("tracing.jl")
+include("reflection.jl")
 
 EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
 

@@ -36,30 +36,6 @@ function cpu_infer(ctx, mi, min_world, max_world)
     return ret
 end
 
-import Core.Compiler: typeinf_nocycle
-# make as much progress on `frame` as possible (by handling cycles)
-function typeinf_nocycle(interp::MixtapeInterpreter, frame::InferenceState)
-    Core.Compiler.typeinf_local(interp, frame)
-
-    # If the current frame is part of a cycle, solve the cycle before finishing
-    no_active_ips_in_callers = false
-    while !no_active_ips_in_callers
-        no_active_ips_in_callers = true
-        for caller in frame.callers_in_cycle
-            caller.dont_work_on_me && return false # cycle is above us on the stack
-            if caller.pc´´ <= caller.nstmts # equivalent to `isempty(caller.ip)`
-                # Note that `typeinf_local(interp, caller)` can potentially modify the other frames
-                # `frame.callers_in_cycle`, which is why making incremental progress requires the
-                # outer while loop.
-                Core.Compiler.typeinf_local(interp, caller)
-                no_active_ips_in_callers = false
-            end
-            caller.valid_worlds = Core.Compiler.intersect(caller.valid_worlds, frame.valid_worlds)
-        end
-    end
-    return true
-end
-
 function infer(wvc, mi, interp::MixtapeInterpreter)
     src = Core.Compiler.typeinf_ext_toplevel(interp, mi)
     ret = Any
@@ -103,6 +79,7 @@ end
 
 function mixtape_hook!(interp, result, mi, src)
     meth = mi.def
+    try
         fn = resolve(GlobalRef(meth.module, meth.name))
         as = map(resolve, result.argtypes[2:end])
         if debug(interp.ctx)
@@ -126,6 +103,9 @@ function mixtape_hook!(interp, result, mi, src)
             src = finish(b)
             src = CodeInfoTools.clean!(src)
         end
+    catch e
+        push!(interp, e)
+    end
     return src
 end
 

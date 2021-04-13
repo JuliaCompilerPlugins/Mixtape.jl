@@ -54,56 +54,6 @@ function _jit(job::CompilerJob)
 end
 
 #####
-##### Experimental: support for AOT compilation
-#####
-
-# TODO: When https://github.com/JuliaGPU/GPUCompiler.jl/compare/jps/static-compile is merged -- refactor.
-
-module MixtapeRuntime
-    # dummy methods
-    signal_exception() = return
-    malloc(sz) = C_NULL
-    report_oom(sz) = return
-    report_exception(ex) = return
-    report_exception_name(ex) = return
-    report_exception_frame(idx, func, file, line) = return
-
-    # for validation
-    sin(x) = Base.sin(x)
-end
-
-import GPUCompiler: runtime_module
-GPUCompiler.runtime_module(::CompilerJob{<:Any, MixtapeCompilerParams}) = MixtapeRuntime
-
-const linker = Sys.isunix() ? "ld.lld" : Sys.isapple() ? "ld64.lld" : "lld-link"
-
-function mixtape_job(ctx, @nospecialize(func), tt;
-               cpu::String = (LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName()),
-               features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures()),
-               name = GPUCompiler.safe_name(repr(func)))
-    source = FunctionSpec(func, tt, false)
-    target = GPUCompiler.NativeCompilerTarget(cpu=cpu, features=features)
-    params = MixtapeCompilerParams(ctx)
-    return CompilerJob(target, source, params)
-end
-
-function aot(ctx::CompilationContext, f::F, tt::TT=Tuple{}; 
-    path = tempname()) where {F, TT <: Type}
-    job = mixtape_job(ctx, f, tt)
-    rt, llvm_specfunc, llvm_func, mod = codegen(job.params.ctx, job.source.f, job.source.tt)
-    specfunc_name = LLVM.name(llvm_specfunc)
-    func_name = LLVM.name(llvm_func)
-    linkage!(llvm_func, LLVM.API.LLVMExternalLinkage)
-    linkage!(llvm_specfunc, LLVM.API.LLVMExternalLinkage)
-    run_pipeline!(mod)
-    GPUCompiler.finish_module!(job, mod)
-    tm = GPUCompiler.llvm_machine(job.target)
-    LLVM.emit(tm, mod, LLVM.API.LLVMObjectFile, path * ".o")
-    LLVM.emit(tm, mod, LLVM.API.LLVMAssemblyFile, path * ".s")
-    return (path, name)
-end
-
-#####
 ##### Call interface
 #####
 

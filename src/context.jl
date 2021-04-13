@@ -96,24 +96,6 @@ allow(::MyCtx, fn::typeof(rand), args...) = true
 ```
 """, allow)
 
-trace!(ctx::CompilationContext, ir) = ir
-
-@doc(
-"""
-    trace!(ctx::CompilationContext, ir::Core.Compiler.IRCode)::Core.Compiler.IRCode
-
-Experimental: User-defined transform which operates on inferred `Core.Compiler.IRCode` produced by the high-level tracing interpreter. This code is re-inferred by `MixtapeInterpreter` after transformations are applied.
-""", trace!)
-
-allow_tracing(f::C) where {C <: CompilationContext} = false
-
-@doc(
-"""
-    allow_tracing(f::CompilationContext)::Bool
-
-Experimental: Allow the high-level tracing interpreter and optimizer.
-""", allow_tracing)
-
 macro ctx(properties, expr)
     @assert(@capture(expr, struct Name_
                          body__
@@ -122,8 +104,8 @@ macro ctx(properties, expr)
     properties = properties.args
     ex = Expr(:block,
               quote
-                  import Mixtape: allow, allow_tracing, show_after_inference, show_after_optimization,
-                                  debug, transform, optimize!, trace!
+                  import Mixtape: allow, show_after_inference, show_after_optimization,
+                                  debug, transform, optimize!
               end, quote
                   struct $Name <: Mixtape.CompilationContext
                       $(body...)

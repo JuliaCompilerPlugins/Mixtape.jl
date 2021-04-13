@@ -34,10 +34,7 @@ end
 ##### Optimize
 #####
 
-function run_passes(interp::MixtapeInterpreter, ci::CodeInfo, nargs::Int, sv::OptimizationState)
-    preserve_coverage = coverage_enabled(sv.mod)
-    ir = convert_to_ircode(ci, copy_exprargs(ci.code), preserve_coverage, nargs, sv)
-    ir = slot2reg(ir, ci, nargs, sv)
+function run_passes(ir::Core.Compiler.IRCode, ci::CodeInfo, sv::OptimizationState)
     ir = compact!(ir)
     ir = ssa_inlining_pass!(ir, ir.linetable, sv.inlining, ci.propagate_inbounds)
     ir = compact!(ir)
@@ -97,8 +94,12 @@ function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
     nargs = Int(opt.nargs) - 1
     mi = opt.linfo
     meth = mi.def
-    ir = run_passes(interp, opt.src, nargs, opt)
+    preserve_coverage = coverage_enabled(opt.mod)
+    ir = convert_to_ircode(opt.src, copy_exprargs(opt.src.code), preserve_coverage, nargs, opt)
+    ir = slot2reg(ir, opt.src, nargs, opt)
+    ir = run_passes(ir, opt.src, opt)
     ir = custom_pass!(interp, mi, ir)
+    ir = run_passes(ir, opt.src, opt)
     verify_ir(ir)
     verify_linetable(ir.linetable)
     return _finish(interp, opt, params, ir, result)

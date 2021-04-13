@@ -4,7 +4,6 @@ const tm = Ref{LLVM.TargetMachine}()
 
 function __init__()
     CACHE[NativeInterpreter] = CodeCache(cpu_invalidate)
-    CACHE[TracingInterpreter] = CodeCache(cpu_invalidate)
 
     opt_level = Base.JLOptions().opt_level
     if opt_level < 2

@@ -1,55 +1,49 @@
 module Tracing
 
 using Mixtape
-using MacroTools
 
-module Factorial
-
-f(x::Int64) = x <= 1 ? 1 : x * f(x - 1)
-
-end
+f(x::Number, y) = sin(x + 1) + (sin(3y) - 1);
 
 @ctx (false, false, false) struct MyMix end
-allow(ctx::MyMix, m::Module) = m == Factorial
+allow(ctx::MyMix, m::Module) = m == Tracing
 
-swap(e) = e
-function swap(e::Expr)
-    new = MacroTools.postwalk(e) do s
-        isexpr(s, :call) || return s
-        s.args[1] == Base.:(*) || return s
-        return Expr(:call, Base.:(+), e.args[2:end]...)
-    end
-    return new
-end
-
-# Secondary interpreter -- gets typed CodeInfo from the first.
-function transform(::MyMix, b)
-    println("Now back to CodeInfo:")
-    display(b)
-    for (v, st) in b
-        replace!(b, v, swap(st))
-    end
-    return b
-end
-
-# "Low-level" optimizer -- after the secondary interpreter.
+using Core.Compiler: Const, is_pure_intrinsic_infer, intrinsic_nothrow, anymap, quoted
 function optimize!(::MyMix, ir)
-    println("Now back to IR:")
-    display(ir)
+    for i in 1 : length(ir.stmts)
+        stmt = ir.stmts[i][:inst]
+        if stmt isa Expr && stmt.head === :call
+            sig = Core.Compiler.call_sig(ir, stmt)
+            f, ft, atypes = sig.f, sig.ft, sig.atypes
+            allconst = true
+            for atype in sig.atypes
+                if !isa(atype, Const)
+                    allconst = false
+                    break
+                end
+            end
+            if allconst &&
+                isa(f, Core.IntrinsicFunction) &&
+                is_pure_intrinsic_infer(f) &&
+                intrinsic_nothrow(f, atypes[2:end])
+
+                fargs = anymap(x::Const -> x.val, atypes[2:end])
+                val = f(fargs...)
+                Core.Compiler.setindex!(ir.stmts[i], quoted(val), :inst)
+                Core.Compiler.setindex!(ir.stmts[i], Const(val), :type)
+            elseif allconst && isa(f, Core.Builtin) && (f === Core.tuple || f === Core.getfield)
+                fargs = anymap(x::Const -> x.val, atypes[2:end])
+                val = f(fargs...)
+                Core.Compiler.setindex!(ir.stmts[i], quoted(val), :inst)
+                Core.Compiler.setindex!(ir.stmts[i], Const(val), :type)
+            end
+        end
+    end
     return ir
 end
 
-# "High-level"  optimizer -- first does type inference, then gets to see the IR before feeding it to the second interpreter.
-function trace!(::MyMix, ir)
-    println("Got some IR:")
-    display(ir)
-    return ir
-end
-
-# Allow the high-level interpreter into the pipeline.
-allow_tracing(ctx::MyMix) = true
-
-entry = Mixtape.jit(MyMix(), Factorial.f, Tuple{Int})
-display(entry(5))
+λ = x -> f(x, 3.0)
+display(Mixtape.@code_inferred MyMix() λ(Float64))
+entry = Mixtape.jit(MyMix(), λ, Tuple{Float64})
+display(entry(5.0))
 
 end # module

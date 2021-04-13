@@ -6,10 +6,6 @@ function code_cache(mxi::MixtapeInterpreter)
     return WorldView(get_cache(typeof(mxi.inner)), get_world_counter(mxi))
 end
 
-function code_cache(tr::TracingInterpreter)
-    return WorldView(get_cache(TracingInterpreter), get_world_counter(tr))
-end
-
 function cpu_invalidate(replaced, max_world)
     cache = get_cache(NativeInterpreter)
     invalidate(cache, replaced, max_world, 0)
@@ -87,14 +83,7 @@ function mixtape_hook!(interp, result, mi, src)
             print("| beg (inf): $(meth.module).$(fn)\n")
         end
         if allow(interp.ctx, meth.module, fn, as...)
-            new = src
-            if allow_tracing(interp.ctx)
-                tr_interp = TracingInterpreter(interp)
-                fr = InferenceState(result, false, tr_interp)
-                l = Core.Compiler.typeinf_local(tr_interp, fr)
-                new = fr.src
-            end
-            b = CodeInfoTools.Builder(new, length(result.argtypes[2:end]))
+            b = CodeInfoTools.Builder(src, length(result.argtypes[2:end]))
             b = transform(interp.ctx, b)
             e = detect_invoke(b, result.linfo)
             if e != nothing

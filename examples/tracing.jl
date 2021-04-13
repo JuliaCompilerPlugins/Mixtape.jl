@@ -24,6 +24,8 @@ end
 
 # Secondary interpreter -- gets typed CodeInfo from the first.
 function transform(::MyMix, b)
+    println("Now back to CodeInfo:")
+    display(b)
     for (v, st) in b
         replace!(b, v, swap(st))
     end
@@ -31,10 +33,18 @@ function transform(::MyMix, b)
 end
 
 # "Low-level" optimizer -- after the secondary interpreter.
-optimize!(::MyMix, ir) = ir
+function optimize!(::MyMix, ir)
+    println("Now back to IR:")
+    display(ir)
+    return ir
+end
 
 # "High-level"  optimizer -- first does type inference, then gets to see the IR before feeding it to the second interpreter.
-trace!(::MyMix, ir) = (display(ir); ir)
+function trace!(::MyMix, ir)
+    println("Got some IR:")
+    display(ir)
+    return ir
+end
 
 # Allow the high-level interpreter into the pipeline.
 allow_tracing(ctx::MyMix) = true

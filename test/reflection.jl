@@ -24,5 +24,6 @@ function transform(::MyMix, b)
     return b
 end
 
+ir = Mixtape.@code_info Reflection.f(Int)
 ir = Mixtape.@code_inferred MyMix() Reflection.f(Int)
 ir = Mixtape.@code_llvm MyMix() Reflection.f(Int)

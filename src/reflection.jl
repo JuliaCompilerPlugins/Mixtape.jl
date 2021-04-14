@@ -5,7 +5,7 @@ end
 macro code_info(call)
     @assert(@capture(call, f_(args__)))
     esc(quote 
-        ir, b = Mixtape._code_info($f, Tuple{$(args...)})
+        ir = Mixtape._code_info($f, Tuple{$(args...)})
         ir
     end)
 end

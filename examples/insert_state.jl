@@ -41,10 +41,9 @@ function swap(r, e::Expr)
 end
 
 function transform(::MyMix, b)
-    pushfirst!(b, Expr(:call, Recorder))
+    q = pushfirst!(b, Expr(:call, Recorder))
     for (v, st) in b
-        e = swap(Core.SSAValue(1), st)
-        v == Core.SSAValue(1) || replace!(b, v, e)
+        b[v] = swap(q, st)
     end
     return b
 end

@@ -1,4 +1,4 @@
-function widen_invokes!(b::CodeInfoTools.Builder)
+function widen_invokes!(b::CodeInfoTools.Pipe)
     counter = 0
     for (v, st) in b
         st isa Expr || continue

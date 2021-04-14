@@ -83,14 +83,13 @@ function custom_pass!(interp::MixtapeInterpreter, result::InferenceResult, mi::C
     as = map(resolve, sig[2 : end])
     debug(interp.ctx) && _debug_prehook(interp, result, mi, src)
     if allow(interp.ctx, mi.def.module, fn, as...)
-        b = CodeInfoTools.Builder(src, length(result.argtypes[2:end]))
-        b = transform(interp.ctx, b)
-        e = detect_invoke(b, result.linfo)
+        p = CodeInfoTools.Pipe(src)
+        p = transform(interp.ctx, p)
+        e = detect_invoke(p, result.linfo)
         if e != nothing
             push!(interp, e)
         end
-        src = finish(b)
-        src = CodeInfoTools.clean!(src)
+        src = finish(p)
     end
     return src
 end

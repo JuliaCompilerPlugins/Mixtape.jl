@@ -32,7 +32,7 @@ function swap(r, e::Expr)
 end
 
 function transform(::StateMix, b)
-    q = pushfirst!(b, Expr(:call, Recorder))
+    q = push!(b, Expr(:call, Recorder))
     for (v, st) in b
         b[v] = swap(q, st)
     end

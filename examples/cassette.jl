@@ -63,15 +63,15 @@ end
 
 function transform(mix::Mix, b)
     mix.stacklevel == 1 || return
-    q = pushfirst!(b, Expr(:call, Context))
+    q = push!(b, Expr(:call, Context))
     rets = Any[]
     for (v, st) in b
         b[v] = swap(q, st)
         st isa Core.ReturnNode && push!(rets, v => st)
     end
     for (n, ret) in rets
-        b[n] = Expr(:call, Base.tuple, ret.val, q)
-        insert!(b, n, Core.ReturnNode(n); after = true)
+        v = insert!(b, n, Expr(:call, Base.tuple, ret.val, q))
+        b[n] = Core.ReturnNode(v)
     end
     mix.stacklevel += 1
     return b

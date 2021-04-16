@@ -19,10 +19,11 @@ end
 
 function transform(::MyMix, b)
     for (v, st) in b
-        replace!(b, v, swap(st))
+        b[v] = swap(st)
     end
     return b
 end
 
+ir = Mixtape.@code_info Reflection.f(Int)
 ir = Mixtape.@code_inferred MyMix() Reflection.f(Int)
 ir = Mixtape.@code_llvm MyMix() Reflection.f(Int)

@@ -24,7 +24,7 @@ end
 
 function transform(::MyMix, b)
     for (v, st) in b
-        replace!(b, v, swap(st))
+        b[v] = swap(st)
     end
     return b
 end

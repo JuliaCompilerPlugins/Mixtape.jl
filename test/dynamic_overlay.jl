@@ -23,7 +23,7 @@ end
 
 function transform(::DynamicMix, b)
     for (v, st) in b
-        replace!(b, v, swap(st))
+        b[v] = swap(st)
     end
     return b
 end

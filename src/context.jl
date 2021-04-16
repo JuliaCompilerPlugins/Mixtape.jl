@@ -42,7 +42,7 @@ Turn on debug tracing for inference and optimization. Displays an instrumentatio
 
 
 transform(ctx::CompilationContext, b) = b
-transform(ctx::CompilationContext, b, sig) = b
+transform(ctx::CompilationContext, b, sig) = transform(ctx, b)
 
 @doc(
 """

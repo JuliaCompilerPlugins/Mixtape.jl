@@ -1,8 +1,8 @@
 f(x::Int64) = x <= 1 ? 1 : x * f(x - 1)
 
-@ctx (true, true, true) struct InvalidationMixMix end
-allow(ctx::InvalidationMixMix, m::Module) = m == Factorial
-debug(::InvalidationMixMix) = false
+@ctx (true, true, true) struct InvalidationMix end
+allow(ctx::InvalidationMix, m::Module) = m == Factorial
+debug(::InvalidationMix) = false
 
 swap(e) = e
 function swap(e::Expr)
@@ -15,21 +15,21 @@ function swap(e::Expr)
     return new
 end
 
-function transform(::InvalidationMixMix, b)
+function transform(::InvalidationMix, b)
     for (v, st) in b
-        replace!(b, v, swap(st))
+        b[v] = swap(st)
     end
     return b
 end
 
-@testset "InvalidationMix" begin
+@testset "Invalidation" begin
     Mixtape.@load_call_interface()
-    @test call(InvalidationMixMix(), Factorial.f, 10) == 55
+    @test call(InvalidationMix(), Factorial.f, 10) == 55
 end
 
 f(x::Int64) = x <= 1 ? 1 : x * f(x - 1)
 
-@testset "InvalidationMix" begin
+@testset "Invalidation" begin
     Mixtape.@load_call_interface()
-    @test call(InvalidationMixMix(), Factorial.f, 10) == 55
+    @test call(InvalidationMix(), Factorial.f, 10) == 55
 end

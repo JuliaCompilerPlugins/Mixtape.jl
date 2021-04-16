@@ -41,11 +41,8 @@ resolve(c::Core.Const) = c.val
 export CompilationContext, allow, transform, optimize!, show_after_inference,
        show_after_optimization, debug, @ctx, @intrinsic
 
-export widen_invokes
-
 include("cache.jl")
 include("world.jl")
-include("utility_transforms.jl")
 include("context.jl")
 include("interpreter.jl")
 include("codegen.jl")

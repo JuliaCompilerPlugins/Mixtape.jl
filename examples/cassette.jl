@@ -61,26 +61,18 @@ function swap(r, e::Expr)
     return Expr(:call, overdub, r, e.args[1:end]...)
 end
 
-function insert_tuple_return!(ctx_val, b)
-    nodes = Any[]
-    for (v, st) in b
-        st isa Core.ReturnNode || continue
-        push!(nodes, v => st)
-    end
-    for (n, ret) in nodes
-        insert!(b, n, Expr(:call, Base.tuple, ret.val, ctx_val))
-        replace!(b, n + 1, Core.ReturnNode(n))
-    end
-end
-
 function transform(mix::Mix, b)
     mix.stacklevel == 1 || return
-    pushfirst!(b, Expr(:call, Context))
+    q = push!(b, Expr(:call, Context))
+    rets = Any[]
     for (v, st) in b
-        e = swap(Core.SSAValue(1), st)
-        v == Core.SSAValue(1) || replace!(b, v, e)
+        b[v] = swap(q, st)
+        st isa Core.ReturnNode && push!(rets, v => st)
     end
-    insert_tuple_return!(Core.SSAValue(1), b)
+    for (n, ret) in rets
+        v = insert!(b, n, Expr(:call, Base.tuple, ret.val, q))
+        b[n] = Core.ReturnNode(v)
+    end
     mix.stacklevel += 1
     return b
 end

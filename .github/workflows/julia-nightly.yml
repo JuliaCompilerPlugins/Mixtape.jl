@@ -35,7 +35,7 @@ jobs:
       - run: |
           julia --project=. -e '
             using Pkg
-            Pkg.add(url="https://github.com/femtomc/CodeInfoTools.jl")
+            Pkg.add(url="https://github.com/JuliaCompilerPlugins/CodeInfoTools.jl")
             Pkg.instantiate()'
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1

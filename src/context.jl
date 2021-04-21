@@ -61,7 +61,7 @@ function transform(::MyCtx, b)
 end
 ```
 
-but more advanced formats are possible. For further utilities, please see [CodeInfoTools.jl](https://github.com/femtomc/CodeInfoTools.jl).
+but more advanced formats are possible. For further utilities, please see [CodeInfoTools.jl](https://github.com/JuliaCompilerPlugins/CodeInfoTools.jl).
 """, transform)
 
 preopt!(ctx::CompilationContext, ir) = ir

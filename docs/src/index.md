@@ -1,6 +1,6 @@
 # API Documentation
 
-Below is the API documentation for [Mixtape.jl](https://github.com/femtomc/Mixtape.jl)
+Below is the API documentation for [Mixtape.jl](https://github.com/JuliaCompilerPlugins/Mixtape.jl)
 
 ```@meta
 CurrentModule = Mixtape

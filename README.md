@@ -9,13 +9,13 @@
 |:------------------------------------------------------:|:-------------------------------:|:-----------------:|
 | [![][gha-1.6-img]][gha-url] [![][gha-nightly-img]][gha-url] | [![][codecov-img]][codecov-url] | [![][dev-docs-img]][dev-docs-url] |
 
-[gha-1.6-img]: https://github.com/femtomc/Mixtape.jl/workflows/julia-1.6/badge.svg
-[gha-nightly-img]: https://github.com/femtomc/Mixtape.jl/workflows/julia-nightly/badge.svg
-[gha-url]: https://github.com/femtomc/Mixtape.jl/actions
-[codecov-img]: https://codecov.io/github/femtomc/Mixtape.jl/badge.svg?branch=master
-[codecov-url]: https://codecov.io/github/femtomc/Mixtape.jl?branch=master
+[gha-1.6-img]: https://github.com/JuliaCompilerPlugins/Mixtape.jl/workflows/julia-1.6/badge.svg
+[gha-nightly-img]: https://github.com/JuliaCompilerPlugins/Mixtape.jl/workflows/julia-nightly/badge.svg
+[gha-url]: https://github.com/JuliaCompilerPlugins/Mixtape.jl/actions
+[codecov-img]: https://codecov.io/github/JuliaCompilerPlugins/Mixtape.jl/badge.svg?branch=master
+[codecov-url]: https://codecov.io/github/JuliaCompilerPlugins/Mixtape.jl?branch=master
 [dev-docs-img]: https://img.shields.io/badge/docs-dev-blue.svg
-[dev-docs-url]: https://femtomc.github.io/Mixtape.jl/dev
+[dev-docs-url]: https://JuliaCompilerPlugins.github.io/Mixtape.jl/dev
 
 > **Note**: Usage of this package requires `julia >= 1.6`.
 
@@ -54,17 +54,17 @@ import Mixtape: CompilationContext,
 
 > In other words, you can futz with stuff without refactoring the stuff.
 
-[The interfaces are well-documented (if experimental).](https://femtomc.github.io/Mixtape.jl/dev/)
+[The interfaces are well-documented (if experimental).](https://JuliaCompilerPlugins.github.io/Mixtape.jl/dev/)
 
-This package pairs well with [CodeInfoTools.jl](https://github.com/femtomc/CodeInfoTools.jl).
+This package pairs well with [CodeInfoTools.jl](https://github.com/JuliaCompilerPlugins/CodeInfoTools.jl).
 
 ## Examples
 
 Now easy as 1, 2, 3!
 
-1. [Start simple!](https://github.com/femtomc/Mixtape.jl/blob/master/examples/simple.jl)
-2. [Recursive musings...](https://github.com/femtomc/Mixtape.jl/blob/master/examples/recursion.jl)
-3. [Have you considered that it is interpreters all the way down?](https://github.com/femtomc/Mixtape.jl/blob/master/examples/cassette.jl)
+1. [Start simple!](https://github.com/JuliaCompilerPlugins/Mixtape.jl/blob/master/examples/simple.jl)
+2. [Recursive musings...](https://github.com/JuliaCompilerPlugins/Mixtape.jl/blob/master/examples/recursion.jl)
+3. [Have you considered that it is interpreters all the way down?](https://github.com/JuliaCompilerPlugins/Mixtape.jl/blob/master/examples/cassette.jl)
 
 ## Package contribution
 

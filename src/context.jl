@@ -46,9 +46,9 @@ transform(ctx::CompilationContext, b, sig) = transform(ctx, b)
 
 @doc(
 """
-    transform(ctx::CompilationContext, b::CodeInfoTools.Builder)::CodeInfoTools.Builder
+    transform(ctx::CompilationContext, b::CodeInfoTools.Pipe)::CodeInfoTools.Pipe
 
-User-defined transform which operates on lowered `CodeInfo` in the form of a `CodeInfoTools.Builder` object.
+User-defined transform which operates on lowered `CodeInfo` in the form of a `CodeInfoTools.Pipe` object.
 
 Transforms might typically follow a simple "replace" format:
 
@@ -91,7 +91,7 @@ end
 """
     allow(f::CompilationContext, args...)::Bool
 
-Determines whether the user-defined `transform`, `preopt!`, and `postopt!` are allowed to look at a lowered `CodeInfoTools.Builder` object or `Core.Compiler.IRCode`.
+Determines whether the user-defined `transform`, `preopt!`, and `postopt!` are allowed to look at a lowered `CodeInfoTools.Pipe` object or `Core.Compiler.IRCode`.
 
 The user is allowed to greenlight modules:
 

@@ -4,12 +4,10 @@ using Mixtape
 using CodeInfoTools
 using CodeInfoTools: var, get_slot, walk
 
+# This is just a fallback stub. We intercept this in inference.
 invert(ret, f, args...)  = f(args...)
 
-@ctx (false, false, false) mutable struct Mix 
-    stacklevel::Int
-end
-Mix() = Mix(1)
+@ctx (false, false, false) struct Mix  end
 
 # Allow the transform on our Target module.
 allow(ctx::Mix, fn::typeof(invert), args...) = true
@@ -27,6 +25,8 @@ function transform(mix::Mix, b, sig)
         push!(b, Expr(:call, Base.getindex, Core.SlotNumber(4), ind))
         setindex!(submap, var(ind), get_slot(forward, a))
     end
+
+    # TODO: this should probably go in reverse.
     for (v, st) in enumerate(forward.code)
         if st isa Expr
             ex = Expr(:call, invert, Int, walk(v -> get(submap, v, v), st).args...) # TODO: need to get return type here I think.
@@ -35,8 +35,8 @@ function transform(mix::Mix, b, sig)
         end
         setindex!(submap, push!(b, ex), var(v))
     end
+
     println("Resultant IR for $(sig):")
-    display(b)
     return b
 end
 
@@ -45,7 +45,7 @@ function foo(x)
 end
 
 Mixtape.@load_call_interface()
-ret = call(Mix(1), invert, 10, foo, 5)
+ret = call(Mix(), invert, 10, foo, 5)
 display(ret)
 
 end # module

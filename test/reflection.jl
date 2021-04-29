@@ -17,11 +17,12 @@ function swap(e::Expr)
     return new
 end
 
-function transform(::MyMix, b)
+function transform(::MyMix, src)
+    b = CodeInfoTools.Pipe(src)
     for (v, st) in b
         b[v] = swap(st)
     end
-    return b
+    return CodeInfoTools.finish(b)
 end
 
 ir = Mixtape.@code_info Reflection.f(Int)

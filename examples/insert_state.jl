@@ -4,6 +4,7 @@ using Mixtape
 import Mixtape: CompilationContext, transform, allow, show_after_inference,
                 show_after_optimization, debug, @load_call_interface
 using MacroTools
+using CodeInfoTools
 using BenchmarkTools
 
 # This shows an example where we recursively modify method calls to record state. Very monadic, dare I say :)
@@ -40,12 +41,13 @@ function swap(r, e::Expr)
     return Expr(:call, r, e.args[1:end]...)
 end
 
-function transform(::MyMix, b)
+function transform(::MyMix, src)
+    b = CodeInfoTools.Pipe(src)
     q = push!(b, Expr(:call, Recorder))
     for (v, st) in b
         b[v] = swap(q, st)
     end
-    return b
+    return CodeInfoTools.finish(b)
 end
 
 function (r::Recorder)(f::Function, args...)

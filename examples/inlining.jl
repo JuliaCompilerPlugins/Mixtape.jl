@@ -12,11 +12,12 @@ invert(ret, f, args...)  = f(args...)
 # Allow the transform on our Target module.
 allow(ctx::Mix, fn::typeof(invert), args...) = true
 
-function transform(mix::Mix, b, sig)
+function transform(mix::Mix, src, sig)
     if !(sig[3] <: Function) || 
         sig[3] === Core.IntrinsicFunction
-        return identity(b)
-    end # If target is not a function, just return b.
+        return src
+    end # If target is not a function, just return src.
+    b = CodeInfoTools.Pipe(src)
     forward = sig[3].instance
     argtypes = sig[4 : end]
     forward = Mixtape._code_info(forward, Tuple{argtypes...})
@@ -37,7 +38,7 @@ function transform(mix::Mix, b, sig)
     end
 
     println("Resultant IR for $(sig):")
-    return b
+    return CodeInfoTools.finish(b)
 end
 
 function foo(x)

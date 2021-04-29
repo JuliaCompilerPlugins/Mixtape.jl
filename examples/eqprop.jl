@@ -2,6 +2,7 @@ module EqualitySaturation
 
 using Mixtape
 using MacroTools
+using CodeInfoTools
 using BenchmarkTools
 
 f(x) = (x - x) + (10 * 15)
@@ -19,8 +20,8 @@ function swap(e::Expr)
     return new
 end
 
-function transform(::MyMix, b)
-    return b
+function transform(::MyMix, src)
+    return src
 end
 
 Mixtape.@load_call_interface()

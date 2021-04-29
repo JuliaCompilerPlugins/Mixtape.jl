@@ -29,11 +29,12 @@ function swap(e::Expr)
     return new
 end
 
-function transform(::RandMix, b)
+function transform(::RandMix, src)
+    b = CodeInfoTools.Pipe(src)
     for (v, st) in b
         b[v] = swap(st)
     end
-    return b
+    return CodeInfoTools.finish(b)
 end
 
 @testset "Rand swap" begin

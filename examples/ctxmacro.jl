@@ -1,6 +1,7 @@
 module CtxMacro
 
 using Mixtape
+using CodeInfoTools
 using MacroTools
 
 foo(x) = x^5
@@ -25,11 +26,12 @@ function swap(e::Expr)
     return new
 end
 
-function transform(::MyMix, b)
+function transform(::MyMix, src)
+    b = CodeInfoTools.Pipe(src)
     for (v, st) in b
         b[v] = swap(st)
     end
-    return b
+    return CodeInfoTools.finish(b)
 end
 
 Mixtape.@load_call_interface()

@@ -37,9 +37,9 @@ function swap(e::Expr)
     return new
 end
 
-# This is pre-inference - you get to see a CodeInfoTools.Pipe instance.
+# This is pre-inference - you get to see a CodeInfoTools.Builder instance.
 function transform(::MyMix, src)
-    b = CodeInfoTools.Pipe(src)
+    b = CodeInfoTools.Builder(src)
     for (v, st) in b
         b[v] = swap(st)
     end

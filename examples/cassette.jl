@@ -62,7 +62,7 @@ function swap(r, e::Expr)
 end
 
 function transform(mix::Mix, src)
-    b = CodeInfoTools.Pipe(src)
+    b = CodeInfoTools.Builder(src)
     mix.stacklevel == 1 || return
     q = push!(b, Expr(:call, Context))
     rets = Any[]

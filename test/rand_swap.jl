@@ -30,7 +30,7 @@ function swap(e::Expr)
 end
 
 function transform(::RandMix, src)
-    b = CodeInfoTools.Pipe(src)
+    b = CodeInfoTools.Builder(src)
     for (v, st) in b
         b[v] = swap(st)
     end

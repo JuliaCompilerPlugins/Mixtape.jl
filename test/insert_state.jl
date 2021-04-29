@@ -32,7 +32,7 @@ function swap(r, e::Expr)
 end
 
 function transform(::StateMix, src)
-    b = CodeInfoTools.Pipe(src)
+    b = CodeInfoTools.Builder(src)
     q = push!(b, Expr(:call, Recorder))
     for (v, st) in b
         b[v] = swap(q, st)

@@ -84,7 +84,7 @@ function custom_pass!(interp::MixtapeInterpreter, result::InferenceResult, mi::C
     debug(interp.ctx) && _debug_prehook(interp, result, mi, src)
     if allow(interp.ctx, mi.def.module, fn, as...)
         new :: Core.CodeInfo = transform(interp.ctx, src, sig)
-        p = CodeInfoTools.Pipe(new)
+        p = CodeInfoTools.Builder(new)
         e = detect_invoke(p, result.linfo)
         if e != nothing
             push!(interp, e)

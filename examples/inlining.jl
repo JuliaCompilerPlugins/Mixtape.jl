@@ -17,7 +17,7 @@ function transform(mix::Mix, src, sig)
         sig[3] === Core.IntrinsicFunction
         return src
     end # If target is not a function, just return src.
-    b = CodeInfoTools.Pipe(src)
+    b = CodeInfoTools.Builder(src)
     forward = sig[3].instance
     argtypes = sig[4 : end]
     forward = Mixtape._code_info(forward, Tuple{argtypes...})

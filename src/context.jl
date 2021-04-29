@@ -46,18 +46,20 @@ transform(ctx::CompilationContext, b, sig) = transform(ctx, b)
 
 @doc(
 """
-    transform(ctx::CompilationContext, b::CodeInfoTools.Pipe)::CodeInfoTools.Pipe
+    transform(ctx::CompilationContext, b::Core.CodeInfo)::Core.CodeInfo
+    transform(ctx::CompilationContext, b::Core.CodeInfo, sig::Tuple)::Core.CodeInfo
 
-User-defined transform which operates on lowered `CodeInfo` in the form of a `CodeInfoTools.Pipe` object.
+User-defined transform which operates on lowered `CodeInfo` in the form of a `CodeInfoTools.Pipe` object. There's two versions: (1) ignores the signature of the current method body under consideration and (2) provides the signature as `sig`.
 
-Transforms might typically follow a simple "replace" format:
+Transforms might typically follow a simple "swap" format using `CodeInfoTools.Builder`:
 
 ```julia
-function transform(::MyCtx, b)
+function transform(::MyCtx, src)
+    b = CodeInfoTools.Builder(b)
     for (k, st) in b
-        replace!(b, k, swap(st))
+        b[k] = swap(st))
     end
-    return b
+    return CodeInfoTools.finish(b)
 end
 ```
 

@@ -2,6 +2,10 @@ function _code_info(@nospecialize(f), @nospecialize(tt))
     return CodeInfoTools.code_info(f, tt)
 end
 
+function _code_info(sig::Type{T}) where T <: Tuple
+    return CodeInfoTools.code_info(sig.parameters...)
+end
+
 macro code_info(call)
     @assert(@capture(call, f_(args__)))
     esc(quote 

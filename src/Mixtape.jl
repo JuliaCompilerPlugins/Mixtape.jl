@@ -63,6 +63,7 @@ import Core.Compiler: InferenceState,
 #####
 
 export CompilationContext, 
+       NoContext,
        allow, 
        transform, 
        preopt!,
@@ -70,6 +71,7 @@ export CompilationContext,
        show_after_inference,
        show_after_optimization, 
        debug, 
+       jit,
        @ctx,
        @load_abi
 
@@ -91,28 +93,18 @@ end
 
 function infer(interp, fn, t::Type{T}) where T <: Tuple
     mi = get_methodinstance(Tuple{typeof(fn), t.parameters...})
-    ccall(:jl_typeinf_begin, Cvoid, ())
-    result = Core.Compiler.InferenceResult(mi)
-    world = Core.Compiler.get_world_counter()
-    frame = Core.Compiler.InferenceState(result, true, interp)
-    frame === nothing && return nothing
-    if Core.Compiler.typeinf(interp, frame)
-        opt_params = Core.Compiler.OptimizationParams(interp)
-        opt = Core.Compiler.OptimizationState(frame, opt_params, interp)
-        Core.Compiler.optimize(interp, opt, opt_params, result)
-    end
-    ccall(:jl_typeinf_end, Cvoid, ())
+    src = Core.Compiler.typeinf_ext_toplevel(interp, mi)
     return mi
 end
 
 #####
-##### Static interpreter
+##### Interpreter
 #####
 
 # Based on: https://github.com/Keno/Compiler3.jl/blob/master/exploration/static.jl
 
 # Holds its own cache.
-struct MixtapeInterpreter{I, C} <: AbstractInterpreter
+struct StaticInterpreter{I, C} <: AbstractInterpreter
     code::Dict{MethodInstance, CodeInstance}
     inner::I
     messages::Vector{Tuple{MethodInstance, Int, String}}
@@ -121,33 +113,33 @@ struct MixtapeInterpreter{I, C} <: AbstractInterpreter
     errors::Vector
 end
 
-function MixtapeInterpreter(; opt = false)
-    return MixtapeInterpreter(Dict{MethodInstance, CodeInstance}(),
-                              NativeInterpreter(), 
-                              Tuple{MethodInstance, Int, String}[],
-                              opt,
-                              NoContext(),
-                              Any[])
+function StaticInterpreter(; ctx = NoContext(), opt = false)
+    return StaticInterpreter(Dict{MethodInstance, CodeInstance}(),
+                             NativeInterpreter(), 
+                             Tuple{MethodInstance, Int, String}[],
+                             opt,
+                             ctx,
+                             Any[])
 end
 
-Base.push!(mxi::MixtapeInterpreter, e) = push!(mxi.errors, e)
-InferenceParams(si::MixtapeInterpreter) = InferenceParams(si.inner)
-OptimizationParams(si::MixtapeInterpreter) = OptimizationParams(si.inner)
-get_world_counter(si::MixtapeInterpreter) = get_world_counter(si.inner)
-get_inference_cache(si::MixtapeInterpreter) = get_inference_cache(si.inner)
-lock_mi_inference(si::MixtapeInterpreter, mi::MethodInstance) = nothing
-unlock_mi_inference(si::MixtapeInterpreter, mi::MethodInstance) = nothing
-code_cache(si::MixtapeInterpreter) = si.code
-Core.Compiler.get(a::Dict, b, c) = Base.get(a,b,c)
+Base.push!(mxi::StaticInterpreter, e) = push!(mxi.errors, e)
+InferenceParams(si::StaticInterpreter) = InferenceParams(si.inner)
+OptimizationParams(si::StaticInterpreter) = OptimizationParams(si.inner)
+get_world_counter(si::StaticInterpreter) = get_world_counter(si.inner)
+get_inference_cache(si::StaticInterpreter) = get_inference_cache(si.inner)
+lock_mi_inference(si::StaticInterpreter, mi::MethodInstance) = nothing
+unlock_mi_inference(si::StaticInterpreter, mi::MethodInstance) = nothing
+code_cache(si::StaticInterpreter) = si.code
+Core.Compiler.get(a::Dict, b, c) = Base.get(a, b, c)
 Core.Compiler.get(a::WorldView{<:Dict}, b, c) = Base.get(a.cache,b,c)
 Core.Compiler.haskey(a::Dict, b) = Base.haskey(a, b)
 Core.Compiler.haskey(a::WorldView{<:Dict}, b) =
 Core.Compiler.haskey(a.cache, b)
 Core.Compiler.setindex!(a::Dict, b, c) = setindex!(a, b, c)
-Core.Compiler.may_optimize(si::MixtapeInterpreter) = si.optimize
-Core.Compiler.may_compress(si::MixtapeInterpreter) = false
-Core.Compiler.may_discard_trees(si::MixtapeInterpreter) = false
-function Core.Compiler.add_remark!(si::MixtapeInterpreter, sv::InferenceState, msg)
+Core.Compiler.may_optimize(si::StaticInterpreter) = si.optimize
+Core.Compiler.may_compress(si::StaticInterpreter) = false
+Core.Compiler.may_discard_trees(si::StaticInterpreter) = false
+function Core.Compiler.add_remark!(si::StaticInterpreter, sv::InferenceState, msg)
     push!(si.messages, (sv.linfo, sv.currpc, msg))
 end
 
@@ -155,7 +147,7 @@ end
 ##### Pre-inference
 #####
 
-function _debug_prehook(interp::MixtapeInterpreter, result, mi, src)
+function _debug_prehook(interp::StaticInterpreter, result, mi, src)
     meth = mi.def
     try
         fn = resolve(GlobalRef(meth.module, meth.name))
@@ -169,7 +161,7 @@ function _debug_prehook(interp::MixtapeInterpreter, result, mi, src)
     end
 end
 
-function custom_pass!(interp::MixtapeInterpreter, result::InferenceResult, mi::Core.MethodInstance, src)
+function custom_pass!(interp::StaticInterpreter, result::InferenceResult, mi::Core.MethodInstance, src)
     src === nothing && return src
     mi.specTypes isa UnionAll && return src
     sig = Tuple(mi.specTypes.parameters)
@@ -181,19 +173,12 @@ function custom_pass!(interp::MixtapeInterpreter, result::InferenceResult, mi::C
     as = map(resolve, sig[2 : end])
     debug(interp.ctx) && _debug_prehook(interp, result, mi, src)
     if allow(interp.ctx, mi.def.module, fn, as...)
-        new :: CodeInfo = transform(interp.ctx, src, sig)
-        b = CodeInfoTools.Builder(new)
-        new = CodeInfoTools.finish(b)
-        e = detect_invoke(CodeInfoTools.Builder(new), result.linfo)
-        if e != nothing
-            push!(interp, e)
-        end
-        src = new
+        src :: CodeInfo = transform(interp.ctx, src, sig)
     end
     return src
 end
 
-function InferenceState(result::InferenceResult, cached::Bool, interp::MixtapeInterpreter)
+function InferenceState(result::InferenceResult, cached::Bool, interp::StaticInterpreter)
     src = Core.Compiler.retrieve_code_info(result.linfo)
     mi = result.linfo
     src = custom_pass!(interp, result, mi, src)
@@ -226,7 +211,7 @@ else
     end
 end
 
-function _debug_prehook(interp::MixtapeInterpreter, mi, opt)
+function _debug_prehook(interp::StaticInterpreter, mi, opt)
     meth = mi.def
     try
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
@@ -247,7 +232,7 @@ function _debug_prehook(interp::MixtapeInterpreter, mi, opt)
     end
 end
 
-function _debug_posthook(interp::MixtapeInterpreter, mi, opt; stage = "opt")
+function _debug_posthook(interp::StaticInterpreter, mi, opt; stage = "opt")
     meth = mi.def
     try 
         fn = resolve(GlobalRef(mi.def.module, mi.def.name))
@@ -267,7 +252,7 @@ function _debug_posthook(interp::MixtapeInterpreter, mi, opt; stage = "opt")
     end
 end
 
-function before_pass!(interp::MixtapeInterpreter, mi::Core.MethodInstance, ir::Core.Compiler.IRCode, opt::OptimizationState)
+function before_pass!(interp::StaticInterpreter, mi::Core.MethodInstance, ir::Core.Compiler.IRCode, opt::OptimizationState)
     mi.specTypes isa UnionAll && return ir
     sig = Tuple(mi.specTypes.parameters)
     if sig[1] <: Function && isdefined(sig[1], :instance)
@@ -283,7 +268,7 @@ function before_pass!(interp::MixtapeInterpreter, mi::Core.MethodInstance, ir::C
     return ir
 end
 
-function after_pass!(interp::MixtapeInterpreter, mi::Core.MethodInstance, ir::Core.Compiler.IRCode, opt::OptimizationState)
+function after_pass!(interp::StaticInterpreter, mi::Core.MethodInstance, ir::Core.Compiler.IRCode, opt::OptimizationState)
     mi.specTypes isa UnionAll && return ir
     sig = Tuple(mi.specTypes.parameters)
     if sig[1] <: Function && isdefined(sig[1], :instance)
@@ -298,7 +283,7 @@ function after_pass!(interp::MixtapeInterpreter, mi::Core.MethodInstance, ir::Co
     return ir
 end
 
-function optimize(interp::MixtapeInterpreter, opt::OptimizationState,
+function optimize(interp::StaticInterpreter, opt::OptimizationState,
         params::OptimizationParams, @nospecialize(result))
     nargs = Int(opt.nargs) - 1
     mi = opt.linfo
@@ -350,13 +335,13 @@ function get_codeinfo(graph::StaticSubGraph,
     return get_codeinfo(get_codeinstance(graph, cursor))
 end
 
-function analyze(@nospecialize(f), tt::Type{T}; opt = false) where T <: Tuple
-    si = MixtapeInterpreter(; opt = opt)
+function analyze(@nospecialize(f), tt::Type{T}; 
+        ctx = NoContext(), opt = false) where T <: Tuple
+    si = StaticInterpreter(; ctx = ctx, opt = opt)
     mi = infer(si, f, tt)
     si, StaticSubGraph(si.code, collect(keys(si.code)), mi)
 end
 
-# Similar to Yao.
 function gather_children(si, ssg, mi)
     # Run inlining to convert calls to invoke.
     haskey(ssg.code, mi) || return Any[] # TODO: When does this happen?
@@ -374,12 +359,14 @@ function gather_children(si, ssg, mi)
     unique(ret)
 end
 
-function filter_messages(si::MixtapeInterpreter, mi::MethodInstance)
+function filter_messages(si::StaticInterpreter, mi::MethodInstance)
     filter(x->x[1] == mi, si.messages)
 end
 
-function analyze_static(@nospecialize(f), tt::Type{T}) where T <: Tuple
-    si = MixtapeInterpreter()
+# No context or opt.
+function analyze_static(@nospecialize(f), tt::Type{T}; 
+        ctx = NoContext()) where T <: Tuple
+    si = StaticInterpreter(; ctx = ctx)
     mi = infer(si, f, tt)
     ssg = StaticSubGraph(si.code, collect(keys(si.code)), mi)
     worklist = Any[(ssg.entry, [])]
@@ -493,9 +480,9 @@ end
 #####
 
 # Interpreter holds the cache.
-function cache_lookup(si::MixtapeInterpreter, mi::MethodInstance,
+function cache_lookup(si::StaticInterpreter, mi::MethodInstance,
         min_world, max_world)
-    return getindex(si.code, mi)
+    getindex(si.code, mi)
 end
 
 # Mostly from GPUCompiler. 
@@ -504,8 +491,9 @@ function codegen(job::CompilerJob)
     f = job.source.f
     tt = job.source.tt
     opt = job.params.opt
-    analyze_static(f, tt)
-    si, ssg = analyze(f, tt; opt = opt) # Populate local cache.
+    analyze_static(f, tt; ctx = job.params.ctx)
+    si, ssg = analyze(f, tt; 
+                      ctx = job.params.ctx, opt = opt) # Populate local cache.
     world = get_world_counter(si)
     λ_lookup = (mi, min, max) -> cache_lookup(si, mi, min, max)
     lookup_cb = @cfunction($λ_lookup, Any, (Any, UInt, UInt))
@@ -561,11 +549,11 @@ function codegen(job::CompilerJob)
     return (Any, llvm_specfunc, llvm_func, llvm_mod)
 end
 
-struct StaticCompilerTarget <: AbstractCompilerTarget end
+struct MixtapeCompilerTarget <: AbstractCompilerTarget end
 
-llvm_triple(::StaticCompilerTarget) = Sys.MACHINE
+llvm_triple(::MixtapeCompilerTarget) = Sys.MACHINE
 
-function llvm_machine(::StaticCompilerTarget)
+function llvm_machine(::MixtapeCompilerTarget)
     opt_level = Base.JLOptions().opt_level
     if opt_level < 2
         optlevel = LLVM.API.LLVMCodeGenLevelNone
@@ -579,8 +567,9 @@ function llvm_machine(::StaticCompilerTarget)
     return tm
 end
 
-struct StaticCompilerParams <: AbstractCompilerParams
+struct MixtapeCompilerParams <: AbstractCompilerParams
     opt::Bool
+    ctx::CompilationContext
 end
 
 struct Entry{F, RT, TT}
@@ -603,11 +592,11 @@ end
 
 const jit_compiled_cache = Dict{UInt, Any}()
 
-function jit(@nospecialize(f), tt::Type{T}; opt = false) where T <: Tuple
+function jit(@nospecialize(f), tt::Type{T}; ctx = NoContext(), opt = false) where T <: Tuple
     fspec = FunctionSpec(f, tt, false, nothing) #=name=#
-    job = CompilerJob(StaticCompilerTarget(), 
+    job = CompilerJob(MixtapeCompilerTarget(), 
                       fspec, 
-                      StaticCompilerParams(opt))
+                      MixtapeCompilerParams(opt, ctx))
     return cached_compilation(jit_compiled_cache, job, _jit, _jitlink)
 end
 
@@ -654,7 +643,8 @@ end
 
 macro load_abi()
     expr = quote
-        function cached_call(entry::Mixtape.Entry{F,RT,TT}, args...) where {F,RT,TT}
+        function cached_call(entry::Mixtape.Entry{F, RT, TT}, 
+                args...) where {F, RT, TT}
 
             # TODO: Fast ABI.
             #ccall(entry.func, Any, (Any, $(nargs...), ), entry.f, $(_args...))
@@ -668,10 +658,17 @@ macro load_abi()
             return expr
         end
 
-        @generated function call(ctx::Mixtape.CompilationContext, f::F, args...) where {F}
+        @generated function _call(ctx::CompilationContext, 
+                f::Function, args...)
             TT = Tuple{args...}
-            entry = Mixtape.jit(ctx(), F.instance, TT)
+            entry = jit(f.instance, TT; 
+                        ctx = ctx(), opt = true)
             return cached_call(entry, args...)
+        end
+
+        function call(f::T, args...; 
+                ctx = NoContext()) where T <: Function
+            _call(ctx, f, args...)
         end
     end
     return esc(expr)

@@ -3,16 +3,10 @@ module How2Mix
 # Unassuming code in an unassuming module...
 module SubFoo
 
-g() = rand()
-
-function h()
-    return g()
-end
-
 function f()
     x = rand()
     y = rand()
-    return x + y + h()
+    return x + y
 end
 
 end
@@ -24,7 +18,7 @@ using CodeInfoTools
 using MacroTools
 
 # 101: How2Mix
-struct MyMix <: CompilationContext end
+@ctx (false, false, false) struct MyMix end
 
 # A few little utility functions for working with Expr instances.
 swap(e) = e
@@ -49,14 +43,10 @@ end
 # MyMix will only transform functions which you explicitly allow.
 # You can also greenlight modules.
 allow(ctx::MyMix, m::Module) = m == SubFoo
-show_after_inference(ctx::MyMix) = false
-show_after_optimization(ctx::MyMix) = false
-debug(ctx::MyMix) = false
 
 # This loads up a call interface which will cache the result of the pipeline.
-Mixtape.@load_call_interface()
-@assert(call(MyMix(), SubFoo.f) == 12)
-@assert(call(MyMix(), SubFoo.f) == 12)
-@assert(SubFoo.f() != 12)
+Mixtape.@load_abi()
+@assert(call(SubFoo.f; ctx = MyMix()) == 8)
+@assert(SubFoo.f() != 8)
 
 end # module

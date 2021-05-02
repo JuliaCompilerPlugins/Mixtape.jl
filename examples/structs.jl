@@ -4,6 +4,7 @@ using Mixtape
 import Mixtape: CompilationContext, transform, allow, show_after_inference,
                 show_after_optimization, debug, @load_call_interface
 using MacroTools
+using CodeInfoTools
 using BenchmarkTools
 
 struct Foo
@@ -35,12 +36,13 @@ function swap(e::Expr)
     return new
 end
 
-function transform(::MyMix, b)
+function transform(::MyMix, src)
+    b = CodeInfoTools.Builder(src)
     for (v, st) in b
         b[v] = swap(st)
     end
     display(b)
-    return b
+    return CodeInfoTools.finish(b)
 end
 
 # Mixtape cached call.

@@ -21,11 +21,12 @@ function swap(e::Expr)
     return new
 end
 
-function transform(::DynamicMix, b)
+function transform(::DynamicMix, src)
+    b = CodeInfoTools.Builder(src)
     for (v, st) in b
         b[v] = swap(st)
     end
-    return b
+    return CodeInfoTools.finish(b)
 end
 
 # JIT compile an entry and call.

@@ -19,11 +19,12 @@ function swap(e::Expr)
     return new
 end
 
-function transform(::RecursionMix, b)
+function transform(::RecursionMix, src)
+    b = CodeInfoTools.Builder(src)
     for (v, st) in b
         b[v] = swap(st)
     end
-    return b
+    return CodeInfoTools.finish(b)
 end
 
 @testset "Recursion" begin

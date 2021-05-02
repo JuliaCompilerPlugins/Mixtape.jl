@@ -61,7 +61,8 @@ function swap(r, e::Expr)
     return Expr(:call, overdub, r, e.args[1:end]...)
 end
 
-function transform(mix::Mix, b)
+function transform(mix::Mix, src)
+    b = CodeInfoTools.Builder(src)
     mix.stacklevel == 1 || return
     q = push!(b, Expr(:call, Context))
     rets = Any[]
@@ -74,7 +75,7 @@ function transform(mix::Mix, b)
         b[n] = Core.ReturnNode(v)
     end
     mix.stacklevel += 1
-    return b
+    return CodeInfoTools.finish(b)
 end
 
 # Optimize decrements the stacklevel. 

@@ -20,6 +20,7 @@ end
 using Mixtape
 import Mixtape: CompilationContext, transform, allow, show_after_inference,
                 show_after_optimization, debug
+using CodeInfoTools
 using MacroTools
 
 # 101: How2Mix
@@ -36,12 +37,13 @@ function swap(e::Expr)
     return new
 end
 
-# This is pre-inference - you get to see a CodeInfoTools.Pipe instance.
-function transform(::MyMix, b)
+# This is pre-inference - you get to see a CodeInfoTools.Builder instance.
+function transform(::MyMix, src)
+    b = CodeInfoTools.Builder(src)
     for (v, st) in b
         b[v] = swap(st)
     end
-    return b
+    return CodeInfoTools.finish(b)
 end
 
 # MyMix will only transform functions which you explicitly allow.

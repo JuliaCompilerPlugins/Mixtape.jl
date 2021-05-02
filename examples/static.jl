@@ -4,9 +4,18 @@ using Mixtape
 
 rosenbrock(x, y, a, b) = (a - x)^2 + b * (y - x^2)^2
 
-Mixtape.Static.analyze_static(rosenbrock, Int, Int, Int, Int)
-si, ssg = Mixtape.Static.analyze(rosenbrock, Int, Int, Int, Int)
+@time entry = Mixtape.jit(rosenbrock, 
+                                 Tuple{Float64, Int, Int, Int}; 
+                                 opt = true)
 
-entry = Mixtape.Static.jit(rosenbrock, Int, Int, Int, Int)
+display(@time entry(3.1, 1, 1, 1))
+display(@time entry(3.1, 1, 1, 1))
+
+@time entry = Mixtape.jit(rosenbrock, 
+                                 Tuple{Int, Int, Int, Int}; 
+                                 opt = true)
+
+display(@time entry(3, 1, 1, 1))
+display(@time entry(3, 1, 1, 1))
 
 end # module

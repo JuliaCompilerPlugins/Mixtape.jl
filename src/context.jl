@@ -180,3 +180,5 @@ show_after_optimization(::MyCtx) = b2
 debug(::MyCtx) = b3
 ```
 """, :(@Mixtape.ctx))
+
+@ctx (false, false, false) struct NoContext end

@@ -85,7 +85,7 @@ function postopt!(mix::Mix, ir)
     return ir
 end
 
-Mixtape.@load_call_interface()
+Mixtape.@load_abi()
 ret, state = call(Mix(1), Target.foo, 5.0)
 display(state)
 @btime call(Mix(1), Target.foo, 5.0)

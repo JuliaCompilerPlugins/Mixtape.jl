@@ -49,6 +49,7 @@ include("codegen.jl")
 include("llvmopt.jl")
 include("interface.jl")
 include("reflection.jl")
+include("static.jl")
 include("init.jl")
 
 end # module

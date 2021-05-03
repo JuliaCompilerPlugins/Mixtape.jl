@@ -595,8 +595,12 @@ end
 @doc(
 """
     @load_abi()
+    ...expands...
+    call(f::T, args...; ctx = NoContext(), 
+        optlevel = Base.JLOptions().opt_level) where T <: Function
 
-A macro which expands to load a generated function `call` into the scope of the calling module. This generated function can be applied to signature argument types `Tuple{ctx<:CompilationContext, f<:Function, args...}`. `call` then creates a new instance of `ctx` and calls `Mixtape.jit` -- it then caches a `ccall` which calls a function pointer to the GPUCompiler-compiled LLVM module.
+
+A macro which expands to define an ABI function `call` into the scope of the calling module. `call` wraps an `@generated` function which is called with signature argument types `Tuple{f <: Function, args...}`. The underlying `@generated` function creates a new instance of `ctx` (thus, a nullary constructor is an implicit requirement of your own subtypes of [`CompilationContext`](@ref) for usage with `call`) and calls [`jit`](@ref) -- it then caches a `ccall` which calls a function pointer to the [GPUCompiler](https://github.com/JuliaGPU/GPUCompiler.jl)-compiled LLVM module.
 
 The `call` interface currently uses a slow ABI `ccall` -- which costs an array allocation for each toplevel `call`. This allocation is required to construct a `Vector{Any}` for the arguments and pass a pointer to it over the line, where the call unboxes each argument.
 """, :(@Mixtape.load_abi))

@@ -12,7 +12,7 @@ struct NoContext <: CompilationContext end
 """
     abstract type CompilationContext end
 
-Parametrize the Mixtape pipeline by inheriting from `CompilationContext`. Similar to the context objects in [Cassette.jl](https://julia.mit.edu/Cassette.jl/stable/contextualdispatch.html). By using the interface methods `show_after_inference`, `show_after_optimization`, `debug`, `transform`, `preopt!`, and `postopt!` -- the user can control different parts of the compilation pipeline.
+Parametrize the Mixtape pipeline by inheriting from `CompilationContext`. Similar to the context objects in [Cassette.jl](https://julia.mit.edu/Cassette.jl/stable/contextualdispatch.html). By using the interface methods [`transform`](@ref), [`preopt!`](@ref), and [`postopt!`](@ref) -- the user can control different parts of the compilation pipeline.
 """, CompilationContext)
 
 transform(ctx::CompilationContext, b) = b
@@ -23,7 +23,7 @@ transform(ctx::CompilationContext, b, sig) = transform(ctx, b)
     transform(ctx::CompilationContext, b::Core.CodeInfo)::Core.CodeInfo
     transform(ctx::CompilationContext, b::Core.CodeInfo, sig::Tuple)::Core.CodeInfo
 
-User-defined transform which operates on lowered `CodeInfo` in the form of a `CodeInfoTools.Pipe` object. There's two versions: (1) ignores the signature of the current method body under consideration and (2) provides the signature as `sig`.
+User-defined transform which operates on lowered `CodeInfo` in the form of a `CodeInfoTools.Builder` object. There's two versions: (1) ignores the signature of the current method body under consideration and (2) provides the signature as `sig`.
 
 Transforms might typically follow a simple "swap" format using `CodeInfoTools.Builder`:
 
@@ -67,7 +67,7 @@ end
 """
     allow(f::CompilationContext, args...)::Bool
 
-Determines whether the user-defined `transform`, `preopt!`, and `postopt!` are allowed to look at a lowered `CodeInfoTools.Pipe` object or `Core.Compiler.IRCode`.
+Determines whether the user-defined [`transform`](@ref), [`preopt!`](@ref), and [`postopt!`](@ref) are allowed to look at a lowered `Core.CodeInfo` or `Core.Compiler.IRCode` instance.
 
 The user is allowed to greenlight modules:
 

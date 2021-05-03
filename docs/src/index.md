@@ -14,8 +14,7 @@ These interfaces parametrize the Mixtape pipeline and allow you to transform low
 CompilationContext
 allow
 transform
-preopt!
-postopt!
+optimize!
 ```
 
 ## Call and codegen interfaces

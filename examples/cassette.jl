@@ -1,7 +1,7 @@
 module CassetteV2
 
 using Mixtape
-import Mixtape: CompilationContext, allow, transform, preopt!, postopt!
+import Mixtape: CompilationContext, allow, transform 
 using CodeInfoTools
 using BenchmarkTools
 
@@ -77,17 +77,6 @@ function transform(mix::Mix, src, sig)
     end
     mix.stacklevel += 1
     return CodeInfoTools.finish(b)
-end
-
-function preopt!(mix::Mix, ir)
-    return ir
-end
-
-# Optimize decrements the stacklevel. 
-# This honestly doesn't really matter, but it is good form.
-function postopt!(mix::Mix, ir)
-    mix.stacklevel -= 1
-    return ir
 end
 
 Mixtape.@load_abi()

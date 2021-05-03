@@ -1,7 +1,7 @@
 module DynamicOverlay
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow, preopt!, postopt!
+import Mixtape: CompilationContext, transform, allow
 using MacroTools
 using CodeInfoTools
 using BenchmarkTools

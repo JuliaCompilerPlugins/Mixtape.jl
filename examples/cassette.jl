@@ -92,6 +92,9 @@ end
 
 Mixtape.@load_abi()
 ret = call(Target.foo, 5.0; ctx = Mix(1))
+ret = call(Target.foo, 5.0; ctx = Mix(1), optlevel = 1)
+ret = call(Target.foo, 5.0; ctx = Mix(1), optlevel = 2)
+ret = call(Target.foo, 5.0; ctx = Mix(1), optlevel = 3)
 display(ret)
 @btime call(Target.foo, 5.0; ctx = Mix(1))
 

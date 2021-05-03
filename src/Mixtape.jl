@@ -113,7 +113,6 @@ struct StaticInterpreter{I, C} <: AbstractInterpreter
     messages::Vector{Tuple{MethodInstance, Int, String}}
     optimize::Bool
     ctx::C
-    errors::Vector
 end
 
 function StaticInterpreter(; ctx = NoContext(), opt = false)
@@ -121,11 +120,9 @@ function StaticInterpreter(; ctx = NoContext(), opt = false)
                              NativeInterpreter(), 
                              Tuple{MethodInstance, Int, String}[],
                              opt,
-                             ctx,
-                             Any[])
+                             ctx)
 end
 
-Base.push!(mxi::StaticInterpreter, e) = push!(mxi.errors, e)
 InferenceParams(si::StaticInterpreter) = InferenceParams(si.inner)
 OptimizationParams(si::StaticInterpreter) = OptimizationParams(si.inner)
 get_world_counter(si::StaticInterpreter) = get_world_counter(si.inner)
@@ -193,7 +190,8 @@ end
 @static if VERSION >= v"1.7.0-DEV.662"
     using Core.Compiler: finish as _finish
 else
-    function _finish(interp::AbstractInterpreter, opt::OptimizationState,
+    function _finish(interp::AbstractInterpreter, 
+            opt::OptimizationState,
             params::OptimizationParams, ir, @nospecialize(result))
         return Core.Compiler.finish(opt, params, ir, result)
     end
@@ -259,10 +257,6 @@ struct StaticSubGraph <: FunctionGraph
 end
 
 entrypoint(ssg::StaticSubGraph) = ssg.entry
-
-cursor_mi(mi::MethodInstance) = mi
-
-has_codeinfo(ssg::StaticSubGraph, mi::MethodInstance) = haskey(ssg.code, mi)
 
 get_codeinstance(ssg::StaticSubGraph, mi::MethodInstance) = getindex(ssg.code, mi)
 
@@ -426,8 +420,7 @@ struct MixtapeCompilerTarget <: AbstractCompilerTarget end
 
 llvm_triple(::MixtapeCompilerTarget) = Sys.MACHINE
 
-function llvm_machine(::MixtapeCompilerTarget)
-    opt_level = Base.JLOptions().opt_level
+function get_llvm_optlevel(opt_level::Int)
     if opt_level < 2
         optlevel = LLVM.API.LLVMCodeGenLevelNone
     elseif opt_level == 2
@@ -435,15 +428,29 @@ function llvm_machine(::MixtapeCompilerTarget)
     else
         optlevel = LLVM.API.LLVMCodeGenLevelAggressive
     end
+    return optlevel
+end
+
+struct MixtapeCompilerParams <: AbstractCompilerParams
+    opt::Bool
+    optlevel::Int
+    ctx::CompilationContext
+end
+
+function MixtapeCompilerParams(; opt = false, 
+        optlevel = Base.JLOptions().opt_level, 
+        ctx = NoContext())
+    return MixtapeCompilerParams(opt, optlevel, ctx)
+end
+
+function llvm_machine(::MixtapeCompilerTarget, 
+        params::MixtapeCompilerParams)
+    optlevel = get_llvm_optlevel(params.optlevel)
     tm = LLVM.JITTargetMachine(; optlevel=optlevel)
     LLVM.asm_verbosity!(tm, true)
     return tm
 end
 
-struct MixtapeCompilerParams <: AbstractCompilerParams
-    opt::Bool
-    ctx::CompilationContext
-end
 
 struct Entry{F, RT, TT}
     f::F
@@ -466,11 +473,15 @@ end
 const jit_compiled_cache = Dict{UInt, Any}()
 
 function jit(@nospecialize(f), tt::Type{T}; 
-        ctx = NoContext(), opt = true) where T <: Tuple
+        ctx = NoContext(), opt = true, 
+        optlevel = Base.JLOptions().opt_level) where T <: Tuple
     fspec = FunctionSpec(f, tt, false, nothing) #=name=#
     job = CompilerJob(MixtapeCompilerTarget(), 
                       fspec, 
-                      MixtapeCompilerParams(opt, ctx))
+                      MixtapeCompilerParams(; 
+                                            opt = opt, 
+                                            ctx = ctx,
+                                            optlevel = optlevel))
     return cached_compilation(jit_compiled_cache, job, _jit, _jitlink)
 end
 
@@ -485,7 +496,7 @@ Returns a callable "thunk" `Entry{F, RT, TT}` where `RT` is the return type of t
 
 function _jitlink(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
     fspec = job.source
-    tm = llvm_machine(job.target)
+    tm = llvm_machine(job.target, job.params)
     orc = LLVM.OrcJIT(tm)
     atexit() do
         return LLVM.dispose(orc)
@@ -496,9 +507,7 @@ function _jitlink(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
     specfunc_ptr = pointer(specfunc_addr)
     func_addr = addressin(orc, jitted_mod, func_name)
     func_ptr = pointer(func_addr)
-    if specfunc_ptr === C_NULL || func_ptr === C_NULL
-        @error "Compilation error" fspec specfunc_ptr func_ptr
-    end
+    @assert(!(specfunc_ptr === C_NULL || func_ptr === C_NULL))
     return Entry{typeof(fspec.f), rt, fspec.tt}(fspec.f, specfunc_ptr, func_ptr)
 end
 
@@ -529,11 +538,15 @@ identity(job::CompilerJob, src) = src
 const emit_compiled_cache = Dict{UInt, Any}()
 
 function emit(@nospecialize(f), tt::Type{T}; 
-        ctx = NoContext(), opt = false) where {F <: Function, T <: Tuple}
+        ctx = NoContext(), opt = false,
+        optlevel = Base.JLOptions().opt_level) where {F <: Function, T <: Tuple}
     fspec = FunctionSpec(f, tt, false, nothing) #=name=#
     job = CompilerJob(MixtapeCompilerTarget(), 
                       fspec, 
-                      MixtapeCompilerParams(opt, ctx))
+                      MixtapeCompilerParams(;
+                                            ctx = ctx,
+                                            opt = opt, 
+                                            optlevel = optlevel))
     return cached_compilation(emit_compiled_cache, job, _emit, identity)
 end
 
@@ -563,16 +576,17 @@ macro load_abi()
         end
 
         @generated function _call(ctx::CompilationContext, 
-                f::Function, args...)
+                optlevel::Val{T}, f::Function, args...) where T
             TT = Tuple{args...}
             entry = jit(f.instance, TT; 
-                        ctx = ctx(), opt = true)
+                        ctx = ctx(), opt = true, optlevel = T)
             return cached_call(entry, args...)
         end
 
         function call(f::T, args...; 
-                ctx = NoContext()) where T <: Function
-            _call(ctx, f, args...)
+                ctx = NoContext(),
+                optlevel = Base.JLOptions().opt_level) where T <: Function
+            _call(ctx, Val(optlevel), f, args...)
         end
     end
     return esc(expr)

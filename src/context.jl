@@ -47,6 +47,15 @@ optimize!(ctx::CompilationContext, b) = julia_passes!(b)
     optimize!(ctx::CompilationContext, b::OptimizationBundle)::Core.Compiler.IRCode
 
 User-defined transform which operates on inferred IR provided by an [`OptimizationBundle`](@ref) instance.
+
+The fallback implementation is:
+```julia
+optimize!(ctx::CompilationContext, b::OptimizationBundle) = julia_passes!(b)
+```
+which runs a set of standard (and required) Julia passes to the lowered and inferred `Core.Compiler.IRCode`.
+
+!!! warning
+    If you overload this method, _you are responsible for the optimization pass_! This means that you should know what you're doing (in general), and you will likely also want to call `julia_passes!` yourself. Be aware of this -- or else you'll receive verification errors on `Core.Compiler.IRCode`.
 """, optimize!)
 
 allow(f::C, args...) where {C <: CompilationContext} = false

@@ -568,11 +568,9 @@ end
 
 Emit typed (and optimized if `opt = true`) `CodeInfo` using the Mixtape pipeline. The user can configure the pipeline with optional arguments:
 
-    1. `ctx::CompilationContext` -- configure [`transform`](@ref), [`preopt!`](@ref), [`postopt!`](@ref).
-
-    2. `opt::Bool` -- configure whether or not the Julia optimizer is run (including [`preopt!`](@ref) and [`postopt!`](@ref)).
-
-    3. `optlevel::Int > 0` -- configure the LLVM optimization level.
+1. `ctx::CompilationContext` -- configure [`transform`](@ref), [`preopt!`](@ref), [`postopt!`](@ref).
+2. `opt::Bool` -- configure whether or not the Julia optimizer is run (including [`preopt!`](@ref) and [`postopt!`](@ref)).
+3. `optlevel::Int > 0` -- configure the LLVM optimization level.
 """, emit)
 
 macro load_abi()

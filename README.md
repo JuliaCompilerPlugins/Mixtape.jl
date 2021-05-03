@@ -39,15 +39,12 @@ In many respects, it is similar to [Cassette.jl](https://github.com/JuliaLabs/Ca
 
 ```julia
 using Mixtape
-using Mixtape: jit, @load_call_interface
+using Mixtape: jit, emit, @load_abi
 import Mixtape: CompilationContext, 
                 allow, 
                 transform, 
                 preopt!,
-                postopt!,
-                show_after_inference,
-                show_after_optimization, 
-                debug
+                postopt!
 ```
 
 `Mixtape.jl` exports a set of interfaces which allows you to interact with aspects of Julia's type inference to modify the lowered code of method instances before placement into a runtime cache. This code can then be executed as part of a self-managed code generation pipeline. This code generation pipeline works through the [LLVM.jl](https://github.com/maleadt/LLVM.jl) and [GPUCompiler.jl](https://github.com/JuliaGPU/GPUCompiler.jl) infrastructure.

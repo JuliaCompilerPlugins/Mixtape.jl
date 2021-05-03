@@ -1,8 +1,7 @@
 module NoInliningAllowed
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow, show_after_inference,
-                show_after_optimization, debug, @load_call_interface
+import Mixtape: CompilationContext, transform, allow
 using MacroTools
 using CodeInfoTools
 using BenchmarkTools
@@ -19,9 +18,6 @@ end
 struct MyMix <: CompilationContext end
 
 allow(ctx::MyMix, m::Module) = m == NoInliningAllowed
-show_after_inference(ctx::MyMix) = false
-show_after_optimization(ctx::MyMix) = false
-debug(ctx::MyMix) = true
 
 swap(e) = e
 function swap(e::Expr)
@@ -42,16 +38,16 @@ function transform(::MyMix, src)
 end
 
 # JIT compile an entry and call.
-fn = Mixtape.jit(MyMix(), f, Tuple{Int64})
+fn = Mixtape.jit(f, Tuple{Int64}; ctx = MyMix())
 display(fn(3))
 display(fn(6))
 @btime fn(6)
 
 # Mixtape cached call.
-Mixtape.@load_call_interface()
-display(call(MyMix(), f, 3))
-display(call(MyMix(), f, 6))
-@btime call(MyMix(), f, 6)
+Mixtape.@load_abi()
+display(call(f, 3; ctx = MyMix()))
+display(call(f, 6; ctx = MyMix()))
+@btime call(f, 6; ctx = MyMix())
 
 # Native.
 f(5)

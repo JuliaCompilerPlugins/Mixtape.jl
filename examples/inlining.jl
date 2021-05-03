@@ -1,13 +1,14 @@
 module Inlining
 
 using Mixtape
+import Mixtape: CompilationContext, transform, allow
 using CodeInfoTools
 using CodeInfoTools: var, get_slot, walk
 
 # This is just a fallback stub. We intercept this in inference.
 invert(ret, f, args...)  = f(args...)
 
-@ctx (false, false, false) struct Mix  end
+struct Mix <: CompilationContext end
 
 # Allow the transform on our Target module.
 allow(ctx::Mix, fn::typeof(invert), args...) = true
@@ -20,7 +21,7 @@ function transform(mix::Mix, src, sig)
     b = CodeInfoTools.Builder(src)
     forward = sig[3].instance
     argtypes = sig[4 : end]
-    forward = Mixtape._code_info(forward, Tuple{argtypes...})
+    forward = CodeInfoTools.code_info(forward, Tuple{argtypes...})
     submap = Dict()
     for (ind, a) in enumerate(forward.slotnames[2 : end])
         push!(b, Expr(:call, Base.getindex, Core.SlotNumber(4), ind))
@@ -38,6 +39,7 @@ function transform(mix::Mix, src, sig)
     end
 
     println("Resultant IR for $(sig):")
+    display(b)
     return CodeInfoTools.finish(b)
 end
 
@@ -45,8 +47,8 @@ function foo(x)
     return x + 5
 end
 
-Mixtape.@load_call_interface()
-ret = call(Mix(), invert, 10, foo, 5)
+Mixtape.@load_abi()
+ret = call(invert, 10, foo, 5; ctx = Mix())
 display(ret)
 
 end # module

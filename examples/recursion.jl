@@ -1,6 +1,7 @@
 module Recursion
 
 using Mixtape
+import Mixtape: CompilationContext, transform, allow
 using CodeInfoTools
 using MacroTools
 
@@ -10,7 +11,7 @@ f(x::Int64) = x <= 1 ? 1 : x * f(x - 1)
 
 end
 
-@ctx (false, false, false) struct MyMix end
+struct MyMix <: CompilationContext end
 allow(ctx::MyMix, m::Module) = m == Factorial
 
 swap(e) = e
@@ -36,7 +37,7 @@ function postopt!(::MyMix, ir)
     ir
 end
 
-Mixtape.@load_call_interface()
-display(call(MyMix(), Factorial.f, 10))
+Mixtape.@load_abi()
+display(call(Factorial.f, 10; ctx = MyMix()))
 
 end # module

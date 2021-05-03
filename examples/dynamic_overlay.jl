@@ -1,6 +1,7 @@
 module DynamicOverlay
 
 using Mixtape
+import Mixtape: CompilationContext, transform, allow, preopt!, postopt!
 using MacroTools
 using CodeInfoTools
 using BenchmarkTools
@@ -14,18 +15,16 @@ function f(x)
     return g(2)
 end
 
-@ctx (false, false, true) struct MyMix end
+struct MyMix <: CompilationContext end
 allow(ctx::MyMix, m::Module) = m == DynamicOverlay
 
 swap(e) = e
 function swap(e::Expr)
-    display(e)
     new = MacroTools.postwalk(e) do s
         isexpr(s, :call) || return s
         s.args[1] == Base.literal_pow || return s
         return Expr(:call, apply, Base.:(*), s.args[3:end]...)
     end
-    display(e)
     return new
 end
 
@@ -38,16 +37,16 @@ function transform(::MyMix, src)
 end
 
 # JIT compile an entry and call.
-fn = Mixtape.jit(MyMix(), f, Tuple{Int64})
+fn = Mixtape.jit(f, Tuple{Int64}; ctx = MyMix())
 display(fn(3))
 display(fn(6))
 @btime fn(6)
 
 # Mixtape cached call.
-Mixtape.@load_call_interface()
-display(call(MyMix(), f, 3))
-display(call(MyMix(), f, 6))
-@btime call(MyMix(), f, 6)
+Mixtape.@load_abi()
+display(call(f, 3; ctx = MyMix()))
+display(call(f, 6; ctx = MyMix()))
+@btime call(f, 6; ctx = MyMix())
 
 # Native.
 f(5)

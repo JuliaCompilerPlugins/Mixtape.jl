@@ -1,8 +1,7 @@
 module Structs
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow, show_after_inference,
-                show_after_optimization, debug, @load_call_interface
+import Mixtape: CompilationContext, transform, allow
 using MacroTools
 using CodeInfoTools
 using BenchmarkTools
@@ -22,9 +21,6 @@ end
 struct MyMix <: CompilationContext end
 
 allow(ctx::MyMix, m::Module) = m == Structs
-show_after_inference(ctx::MyMix) = false
-show_after_optimization(ctx::MyMix) = false
-debug(ctx::MyMix) = true
 
 swap(e) = e
 function swap(e::Expr)
@@ -46,8 +42,8 @@ function transform(::MyMix, src)
 end
 
 # Mixtape cached call.
-Mixtape.@load_call_interface()
-display(call(MyMix(), f, Foo(10.0), 5.0))
-@btime call(MyMix(), f, Foo(10.0), 5.0)
+Mixtape.@load_abi()
+display(call(f, Foo(10.0), 5.0; ctx = MyMix()))
+@btime call(f, Foo(10.0), 5.0; ctx = MyMix())
 
 end # module

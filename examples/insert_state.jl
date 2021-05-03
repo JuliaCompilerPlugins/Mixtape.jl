@@ -1,8 +1,7 @@
 module InsertState
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow, show_after_inference,
-                show_after_optimization, debug, @load_call_interface
+import Mixtape: CompilationContext, transform, allow 
 using MacroTools
 using CodeInfoTools
 using BenchmarkTools
@@ -24,8 +23,6 @@ end
 struct MyMix <: CompilationContext end
 
 allow(ctx::MyMix, m::Module, fn, args...) = m == Target
-show_after_inference(ctx::MyMix) = true
-show_after_optimization(ctx::MyMix) = true
 debug(ctx::MyMix) = false
 
 mutable struct Recorder
@@ -52,7 +49,7 @@ end
 
 function (r::Recorder)(f::Function, args...)
     args = map(a -> a isa Recorder ? a.ret : a, args)
-    rec = call(MyMix(), f, args...)
+    rec = call(f, args...; ctx = MyMix())
     if rec isa Recorder
         merge!(r.d, rec.d)
         r.d[(f, args...)] = rec.ret
@@ -64,8 +61,8 @@ function (r::Recorder)(f::Function, args...)
     return r
 end
 
-Mixtape.@load_call_interface()
-display(call(MyMix(), Target.foo, 5.0))
-@btime call(MyMix(), Target.foo, 5.0)
+Mixtape.@load_abi()
+display(call(Target.foo, 5.0; ctx = MyMix()))
+@btime call(Target.foo, 5.0; ctx = MyMix())
 
 end # module

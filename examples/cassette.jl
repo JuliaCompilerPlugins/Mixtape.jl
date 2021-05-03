@@ -1,6 +1,7 @@
 module CassetteV2
 
 using Mixtape
+import Mixtape: CompilationContext, allow, transform, preopt!, postopt!
 using CodeInfoTools
 using BenchmarkTools
 
@@ -22,7 +23,7 @@ end
 # I don't want to apply the recursive transform in type inference.
 # So when stacklevel > 1, don't apply.
 # I'll just dispatch to `Mixtape.call` at runtime.
-@ctx (false, false, false) mutable struct Mix 
+mutable struct Mix <: CompilationContext
     stacklevel::Int
 end
 Mix() = Mix(1)
@@ -45,7 +46,7 @@ function overdub(ctx::Context, ::typeof(+), args...)
 end
 
 function overdub(ctx::Context, fn::Function, args...)
-    ret, inner = call(Mix(), fn, args...)
+    ret, inner = call(fn, args...; ctx = Mix())
     Base.merge!(ctx.d, inner.d)
     return ret
 end
@@ -61,9 +62,9 @@ function swap(r, e::Expr)
     return Expr(:call, overdub, r, e.args[1:end]...)
 end
 
-function transform(mix::Mix, src)
+function transform(mix::Mix, src, sig)
     b = CodeInfoTools.Builder(src)
-    mix.stacklevel == 1 || return
+    mix.stacklevel == 1 || return src
     q = push!(b, Expr(:call, Context))
     rets = Any[]
     for (v, st) in b
@@ -78,6 +79,10 @@ function transform(mix::Mix, src)
     return CodeInfoTools.finish(b)
 end
 
+function preopt!(mix::Mix, ir)
+    return ir
+end
+
 # Optimize decrements the stacklevel. 
 # This honestly doesn't really matter, but it is good form.
 function postopt!(mix::Mix, ir)
@@ -85,9 +90,14 @@ function postopt!(mix::Mix, ir)
     return ir
 end
 
-Mixtape.@load_call_interface()
-ret, state = call(Mix(1), Target.foo, 5.0)
-display(state)
-@btime call(Mix(1), Target.foo, 5.0)
+Mixtape.@load_abi()
+ret = call(Target.foo, 5.0; ctx = Mix(1))
+display(ret)
+@btime call(Target.foo, 5.0; ctx = Mix(1))
+
+src = emit(Target.foo, Tuple{Float64}; 
+           ctx = Mix(1), opt = true)
+display(src)
+display(src.ssavaluetypes)
 
 end # module

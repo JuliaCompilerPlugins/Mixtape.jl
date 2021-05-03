@@ -12,7 +12,7 @@ struct NoContext <: CompilationContext end
 """
     abstract type CompilationContext end
 
-Parametrize the Mixtape pipeline by inheriting from `CompilationContext`. Similar to the context objects in [Cassette.jl](https://julia.mit.edu/Cassette.jl/stable/contextualdispatch.html). By using the interface methods [`transform`](@ref), [`preopt!`](@ref), and [`postopt!`](@ref) -- the user can control different parts of the compilation pipeline.
+Parametrize the Mixtape pipeline by inheriting from `CompilationContext`. Similar to the context objects in [Cassette.jl](https://julia.mit.edu/Cassette.jl/stable/contextualdispatch.html). By using the interface methods [`transform`](@ref) and [`optimize!`](@ref) -- the user can control different parts of the compilation pipeline.
 """, CompilationContext)
 
 transform(ctx::CompilationContext, b) = b
@@ -40,23 +40,14 @@ end
 but more advanced formats are possible. For further utilities, please see [CodeInfoTools.jl](https://github.com/JuliaCompilerPlugins/CodeInfoTools.jl).
 """, transform)
 
-preopt!(ctx::CompilationContext, ir) = ir
+optimize!(ctx::CompilationContext, b) = julia_passes!(b)
 
 @doc(
 """
-    preopt!(ctx::CompilationContext, ir::Core.Compiler.IRCode)::Core.Compiler.IRCode
+    optimize!(ctx::CompilationContext, b::OptimizationBundle)::Core.Compiler.IRCode
 
-User-defined transform which operates on inferred `Core.Compiler.IRCode`. This transform operates **before** a set of optimizations which mimic Julia's pipeline.
-""", preopt!)
-
-postopt!(ctx::CompilationContext, ir) = ir
-
-@doc(
-"""
-    postopt!(ctx::CompilationContext, ir::Core.Compiler.IRCode)::Core.Compiler.IRCode
-
-User-defined transform which operates on inferred `Core.Compiler.IRCode`. This transform operates **after** a set of optimizations which mimic Julia's pipeline.
-""", postopt!)
+User-defined transform which operates on inferred IR provided by an [`OptimizationBundle`](@ref) instance.
+""", optimize!)
 
 allow(f::C, args...) where {C <: CompilationContext} = false
 function allow(ctx::CompilationContext, mod::Module, fn, args...)
@@ -67,7 +58,7 @@ end
 """
     allow(f::CompilationContext, args...)::Bool
 
-Determines whether the user-defined [`transform`](@ref), [`preopt!`](@ref), and [`postopt!`](@ref) are allowed to look at a lowered `Core.CodeInfo` or `Core.Compiler.IRCode` instance.
+Determines whether the user-defined [`transform`](@ref), [`preoptimize!`](@ref), and [`postoptimize!`](@ref) are allowed to look at a lowered `Core.CodeInfo` or `Core.Compiler.IRCode` instance.
 
 The user is allowed to greenlight modules:
 

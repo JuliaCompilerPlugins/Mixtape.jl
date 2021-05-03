@@ -1,7 +1,7 @@
 module Tracing
 
 using Mixtape
-import Mixtape: CompilationContext, transform, postopt!, allow
+import Mixtape: CompilationContext, transform, optimize!, allow
 
 f(x::Number, y) = sin(x + 1) + (sin(3y) - 1);
 
@@ -18,7 +18,8 @@ allow(ctx::MyMix, m::Module) = m == Tracing
 
 using Core.Compiler: Const, is_pure_intrinsic_infer, intrinsic_nothrow, anymap, quoted
 
-function postopt!(::MyMix, ir)
+function optimize!(::MyMix, b)
+    ir = julia_passes!(b)
     for i in 1 : length(ir.stmts)
         stmt = ir.stmts[i][:inst]
         if stmt isa Expr && stmt.head === :call

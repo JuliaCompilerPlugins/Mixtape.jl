@@ -66,8 +66,11 @@ export CompilationContext,
        NoContext,
        allow, 
        transform, 
-       preopt!,
-       postopt!,
+       optimize!,
+       OptimizationBundle,
+       get_ir,
+       get_state,
+       julia_passes!,
        jit,
        emit,
        @ctx,
@@ -176,17 +179,6 @@ end
 ##### Julia optimization pipeline
 #####
 
-function julia_passes(ir::Core.Compiler.IRCode, ci::CodeInfo, sv::OptimizationState)
-    ir = compact!(ir)
-    ir = ssa_inlining_pass!(ir, ir.linetable, sv.inlining, ci.propagate_inbounds)
-    ir = compact!(ir)
-    ir = getfield_elim_pass!(ir)
-    ir = adce_pass!(ir)
-    ir = type_lift_pass!(ir)
-    ir = compact!(ir)
-    return ir
-end
-
 @static if VERSION >= v"1.7.0-DEV.662"
     using Core.Compiler: finish as _finish
 else
@@ -197,35 +189,38 @@ else
     end
 end
 
-function before_pass!(interp::StaticInterpreter, mi::Core.MethodInstance, ir::Core.Compiler.IRCode, opt::OptimizationState)
-    mi.specTypes isa UnionAll && return ir
-    sig = Tuple(mi.specTypes.parameters)
-    if sig[1] <: Function && isdefined(sig[1], :instance)
-        fn = sig[1].instance
-    else
-        fn = sig[1]
+struct OptimizationBundle
+    ir::Core.Compiler.IRCode
+    sv::OptimizationState
+end
+get_ir(b::OptimizationBundle) = b.ir
+get_state(b::OptimizationBundle) = b.sv
+
+@doc(
+"""
+    struct OptimizationBundle
+        ir::Core.Compiler.IRCode
+        sv::OptimizationState
     end
-    as = map(resolve, sig[2 : end])
-    if allow(interp.ctx, mi.def.module, fn, as...)
-        ir = preopt!(interp.ctx, ir)
-    end
+    get_ir(b::OptimizationBundle) = b.ir
+    get_state(b::OptimizationBundle) = b.sv
+
+Object which holds inferred `ir::Core.Compiler.IRCode` and a `Core.Compiler.OptimizationState`. Provided to the user through [`optimize!`](@ref), so that the user may plug in their own optimizations.
+""", OptimizationBundle)
+
+function julia_passes!(ir::Core.Compiler.IRCode, ci::CodeInfo, 
+        sv::OptimizationState)
+    ir = compact!(ir)
+    ir = ssa_inlining_pass!(ir, ir.linetable, sv.inlining, ci.propagate_inbounds)
+    ir = compact!(ir)
+    ir = getfield_elim_pass!(ir)
+    ir = adce_pass!(ir)
+    ir = type_lift_pass!(ir)
+    ir = compact!(ir)
     return ir
 end
 
-function after_pass!(interp::StaticInterpreter, mi::Core.MethodInstance, ir::Core.Compiler.IRCode, opt::OptimizationState)
-    mi.specTypes isa UnionAll && return ir
-    sig = Tuple(mi.specTypes.parameters)
-    if sig[1] <: Function && isdefined(sig[1], :instance)
-        fn = sig[1].instance
-    else
-        fn = sig[1]
-    end
-    as = map(resolve, sig[2 : end])
-    if allow(interp.ctx, mi.def.module, fn, as...)
-        ir = postopt!(interp.ctx, ir)
-    end
-    return ir
-end
+julia_passes!(b::OptimizationBundle) = julia_passes!(b.ir, b.sv.src, b.sv)
 
 function optimize(interp::StaticInterpreter, opt::OptimizationState,
         params::OptimizationParams, @nospecialize(result))
@@ -235,10 +230,8 @@ function optimize(interp::StaticInterpreter, opt::OptimizationState,
     preserve_coverage = coverage_enabled(opt.mod)
     ir = convert_to_ircode(opt.src, copy_exprargs(opt.src.code), preserve_coverage, nargs, opt)
     ir = slot2reg(ir, opt.src, nargs, opt)
-    ir = before_pass!(interp, mi, ir, opt)
-    ir = julia_passes(ir, opt.src, opt)
-    ir = after_pass!(interp, mi, ir, opt)
-    ir = julia_passes(ir, opt.src, opt)
+    b = OptimizationBundle(ir, opt)
+    ir :: Core.Compiler.IRCode = optimize!(interp.ctx, b)
     verify_ir(ir)
     verify_linetable(ir.linetable)
     return _finish(interp, opt, params, ir, result)
@@ -360,7 +353,7 @@ function codegen(job::CompilerJob)
     tt = job.source.tt
     opt = job.params.opt
     si, ssg = analyze(f, tt; 
-        ctx = job.params.ctx, opt = opt) # Populate local cache.
+                      ctx = job.params.ctx, opt = opt) # Populate local cache.
     world = get_world_counter(si)
     λ_lookup = (mi, min, max) -> cache_lookup(si, mi, min, max)
     lookup_cb = @cfunction($λ_lookup, Any, (Any, UInt, UInt))
@@ -496,9 +489,9 @@ Compile and specialize a method instance for signature `Tuple{f, tt.parameters..
 Returns a callable instance of `Entry{F, RT, TT}` where `RT` is the return type of the instance after inference.
 
 The user can configure the pipeline with optional arguments:
-    
-- `ctx::CompilationContext` -- configure [`transform`](@ref), [`preopt!`](@ref), [`postopt!`](@ref).
-- `opt::Bool` -- configure whether or not the Julia optimizer is run (including [`preopt!`](@ref) and [`postopt!`](@ref)).
+
+- `ctx::CompilationContext` -- configure [`transform`](@ref) and [`optimize!`](@ref).
+- `opt::Bool` -- configure whether or not the Julia optimizer is run (including [`optimize!`](@ref)).
 - `optlevel::Int > 0` -- configure the LLVM optimization level.
 """, jit)
 
@@ -537,7 +530,7 @@ function _emit(job::CompilerJob)
     tt = job.source.tt
     opt = job.params.opt
     si, ssg = analyze(f, tt; 
-        ctx = job.params.ctx, opt = opt) # Populate local cache.
+                      ctx = job.params.ctx, opt = opt) # Populate local cache.
     return get_codeinfo(ssg, entrypoint(ssg))
 end
 
@@ -565,8 +558,8 @@ end
 
 Emit typed (and optimized if `opt = true`) `CodeInfo` using the Mixtape pipeline. The user can configure the pipeline with optional arguments:
 
-- `ctx::CompilationContext` -- configure [`transform`](@ref), [`preopt!`](@ref), [`postopt!`](@ref).
-- `opt::Bool` -- configure whether or not the Julia optimizer is run (including [`preopt!`](@ref) and [`postopt!`](@ref)).
+- `ctx::CompilationContext` -- configure [`transform`](@ref) and [`optimize!`](@ref).
+- `opt::Bool` -- configure whether or not the Julia optimizer is run (including [`optimize!`](@ref)).
 """, emit)
 
 macro load_abi()

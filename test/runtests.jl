@@ -5,8 +5,7 @@ using Mixtape
 import Mixtape: CompilationContext,
                 allow,
                 transform,
-                preopt!,
-                postopt!
+                optimize!
 using CodeInfoTools
 using MacroTools
 

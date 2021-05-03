@@ -68,10 +68,8 @@ export CompilationContext,
        transform, 
        preopt!,
        postopt!,
-       show_after_inference,
-       show_after_optimization, 
-       debug, 
        jit,
+       emit,
        @ctx,
        @load_abi
 
@@ -94,6 +92,11 @@ end
 function infer(interp, fn, t::Type{T}) where T <: Tuple
     mi = get_methodinstance(Tuple{typeof(fn), t.parameters...})
     src = Core.Compiler.typeinf_ext_toplevel(interp, mi)
+    @assert(haskey(interp.code, mi))
+    ci = getindex(interp.code, mi)
+    if ci !== nothing && ci.inferred === nothing
+        ci.inferred = src
+    end
     return mi
 end
 
@@ -147,20 +150,6 @@ end
 ##### Pre-inference
 #####
 
-function _debug_prehook(interp::StaticInterpreter, result, mi, src)
-    meth = mi.def
-    try
-        fn = resolve(GlobalRef(meth.module, meth.name))
-        as = map(resolve, result.argtypes[2:end])
-        if debug(interp.ctx)
-            print("@ ($(meth.file), L$(meth.line))\n")
-            print("| beg (inf): $(meth.module).$(fn)\n")
-        end
-    catch e
-        push!(interp, e)
-    end
-end
-
 function custom_pass!(interp::StaticInterpreter, result::InferenceResult, mi::Core.MethodInstance, src)
     src === nothing && return src
     mi.specTypes isa UnionAll && return src
@@ -171,9 +160,8 @@ function custom_pass!(interp::StaticInterpreter, result::InferenceResult, mi::Co
         fn = sig[1]
     end
     as = map(resolve, sig[2 : end])
-    debug(interp.ctx) && _debug_prehook(interp, result, mi, src)
     if allow(interp.ctx, mi.def.module, fn, as...)
-        src :: CodeInfo = transform(interp.ctx, src, sig)
+        src = transform(interp.ctx, src, sig)
     end
     return src
 end
@@ -195,7 +183,7 @@ function julia_passes(ir::Core.Compiler.IRCode, ci::CodeInfo, sv::OptimizationSt
     ir = compact!(ir)
     ir = ssa_inlining_pass!(ir, ir.linetable, sv.inlining, ci.propagate_inbounds)
     ir = compact!(ir)
-    ir = getfield_elim_pass!(ir) # SROA
+    ir = getfield_elim_pass!(ir)
     ir = adce_pass!(ir)
     ir = type_lift_pass!(ir)
     ir = compact!(ir)
@@ -211,47 +199,6 @@ else
     end
 end
 
-function _debug_prehook(interp::StaticInterpreter, mi, opt)
-    meth = mi.def
-    try
-        fn = resolve(GlobalRef(mi.def.module, mi.def.name))
-        as = map(resolve, mi.specTypes.parameters[2:end])
-        if allow(interp.ctx, mi.def.module, fn, as...) && show_after_inference(interp.ctx)
-            print("@ ($(meth.file), L$(meth.line))\n")
-            print("| (inf) $(mi.def.module).$fn\n")
-            println(opt.src)
-        end
-        if debug(interp.ctx)
-            println("@ ($(meth.file), L$(meth.line))")
-            println("| end (inf): $(meth.module).$(fn)")
-            println("@ ($(meth.file), L$(meth.line))")
-            println("| beg (opt): $(meth.module).$(fn)")
-        end
-    catch e
-        push!(interp, e)
-    end
-end
-
-function _debug_posthook(interp::StaticInterpreter, mi, opt; stage = "opt")
-    meth = mi.def
-    try 
-        fn = resolve(GlobalRef(mi.def.module, mi.def.name))
-        as = map(resolve, mi.specTypes.parameters[2:end])
-        if allow(interp.ctx, mi.def.module, fn, as...) &&
-            show_after_optimization(interp.ctx)
-            print("@ ($(meth.file), L$(meth.line))\n")
-            print("| (opt) $(opt.linfo.def.module).$fn\n")
-            println(opt.src)
-        end
-        if debug(interp.ctx)
-            println("@ ($(meth.file), L$(meth.line))")
-            println("| end (opt): $(meth.module).$(fn)")
-        end
-    catch e
-        push!(interp, e)
-    end
-end
-
 function before_pass!(interp::StaticInterpreter, mi::Core.MethodInstance, ir::Core.Compiler.IRCode, opt::OptimizationState)
     mi.specTypes isa UnionAll && return ir
     sig = Tuple(mi.specTypes.parameters)
@@ -261,7 +208,6 @@ function before_pass!(interp::StaticInterpreter, mi::Core.MethodInstance, ir::Co
         fn = sig[1]
     end
     as = map(resolve, sig[2 : end])
-    debug(interp.ctx) && _debug_prehook(interp, mi, opt)
     if allow(interp.ctx, mi.def.module, fn, as...)
         ir = preopt!(interp.ctx, ir)
     end
@@ -295,7 +241,6 @@ function optimize(interp::StaticInterpreter, opt::OptimizationState,
     ir = julia_passes(ir, opt.src, opt)
     ir = after_pass!(interp, mi, ir, opt)
     ir = julia_passes(ir, opt.src, opt)
-    debug(interp.ctx) && _debug_posthook(interp, mi, opt)
     verify_ir(ir)
     verify_linetable(ir.linetable)
     return _finish(interp, opt, params, ir, result)
@@ -340,77 +285,6 @@ function analyze(@nospecialize(f), tt::Type{T};
     si = StaticInterpreter(; ctx = ctx, opt = opt)
     mi = infer(si, f, tt)
     si, StaticSubGraph(si.code, collect(keys(si.code)), mi)
-end
-
-function gather_children(si, ssg, mi)
-    # Run inlining to convert calls to invoke.
-    haskey(ssg.code, mi) || return Any[] # TODO: When does this happen?
-    ci = get_codeinfo(ssg, mi)
-    params = OptimizationParams()
-    sv = OptimizationState(ssg.entry, params, si)
-    sv.slottypes .= ci.slottypes
-    nargs = Int(sv.nargs) - 1
-    ir = Core.Compiler.run_passes(ci, nargs, sv)
-    ret = Any[]
-    for stmt in ir.stmts
-        Core.Compiler.isexpr(stmt, :invoke) || continue
-        push!(ret, stmt.args[1])
-    end
-    unique(ret)
-end
-
-function filter_messages(si::StaticInterpreter, mi::MethodInstance)
-    filter(x->x[1] == mi, si.messages)
-end
-
-# No context or opt.
-function analyze_static(@nospecialize(f), tt::Type{T}; 
-        ctx = NoContext()) where T <: Tuple
-    si = StaticInterpreter(; ctx = ctx)
-    mi = infer(si, f, tt)
-    ssg = StaticSubGraph(si.code, collect(keys(si.code)), mi)
-    worklist = Any[(ssg.entry, [])]
-    visited = Set{Any}(worklist)
-    while !isempty(worklist)
-        mi, stack = popfirst!(worklist)
-        global cur_mi
-        cur_mi = mi
-        for msg in filter_messages(si, mi)
-            print("In function: ")
-            Base.show_tuple_as_call(stdout, mi.def.name, mi.specTypes)
-            println()
-            printstyled("ERROR: ", color=:red)
-            println(msg[3]);
-            ci = get_codeinfo(ssg, mi)
-            loc = ci.linetable[ci.codelocs[msg[2]]]
-            fname = String(loc.file)
-            if startswith(fname, "REPL[")
-                hp = Base.active_repl.interface.modes[1].hist
-                repl_id = parse(Int, fname[6:end-1])
-                repl_contents = hp.history[repl_id+hp.start_idx]
-                for (n, line) in enumerate(split(repl_contents, '\n'))
-                    print(n == loc.line ? "=> " : "$n| ")
-                    println(line)
-                end
-            else
-                println("TODO: File content here")
-            end
-            println()
-            for (i, old_mi) in enumerate(reverse(stack))
-                print("[$i] In ")
-                Base.show_tuple_as_call(stdout, old_mi.def.name, old_mi.specTypes)
-                println()
-            end
-            println()
-        end
-        children = gather_children(si, ssg, mi)
-        for child in children
-            if !(child in visited)
-                push!(worklist, (child, [copy(stack); mi]))
-            end
-            push!(visited, mi)
-        end
-    end
 end
 
 #####
@@ -476,13 +350,13 @@ function optimize!(tm, mod::LLVM.Module)
 end
 
 #####
-##### Cached compilation
+##### Entry codegen with cached compilation
 #####
 
 # Interpreter holds the cache.
 function cache_lookup(si::StaticInterpreter, mi::MethodInstance,
         min_world, max_world)
-    getindex(si.code, mi)
+    Base.get(si.code, mi, nothing)
 end
 
 # Mostly from GPUCompiler. 
@@ -491,9 +365,8 @@ function codegen(job::CompilerJob)
     f = job.source.f
     tt = job.source.tt
     opt = job.params.opt
-    analyze_static(f, tt; ctx = job.params.ctx)
     si, ssg = analyze(f, tt; 
-                      ctx = job.params.ctx, opt = opt) # Populate local cache.
+        ctx = job.params.ctx, opt = opt) # Populate local cache.
     world = get_world_counter(si)
     λ_lookup = (mi, min, max) -> cache_lookup(si, mi, min, max)
     lookup_cb = @cfunction($λ_lookup, Any, (Any, UInt, UInt))
@@ -592,7 +465,8 @@ end
 
 const jit_compiled_cache = Dict{UInt, Any}()
 
-function jit(@nospecialize(f), tt::Type{T}; ctx = NoContext(), opt = false) where T <: Tuple
+function jit(@nospecialize(f), tt::Type{T}; 
+        ctx = NoContext(), opt = true) where T <: Tuple
     fspec = FunctionSpec(f, tt, false, nothing) #=name=#
     job = CompilerJob(MixtapeCompilerTarget(), 
                       fspec, 
@@ -638,8 +512,38 @@ function _jit(job::CompilerJob)
 end
 
 #####
-##### Call interface
+##### Emission and call interface
 #####
+
+function _emit(job::CompilerJob)
+    f = job.source.f
+    tt = job.source.tt
+    opt = job.params.opt
+    si, ssg = analyze(f, tt; 
+        ctx = job.params.ctx, opt = opt) # Populate local cache.
+    return get_codeinfo(ssg, entrypoint(ssg))
+end
+
+identity(job::CompilerJob, src) = src
+
+const emit_compiled_cache = Dict{UInt, Any}()
+
+function emit(@nospecialize(f), tt::Type{T}; 
+        ctx = NoContext(), opt = false) where {F <: Function, T <: Tuple}
+    fspec = FunctionSpec(f, tt, false, nothing) #=name=#
+    job = CompilerJob(MixtapeCompilerTarget(), 
+                      fspec, 
+                      MixtapeCompilerParams(opt, ctx))
+    return cached_compilation(emit_compiled_cache, job, _emit, identity)
+end
+
+@doc(
+"""
+    emit(@nospecialize(f), tt::Type{T};
+        ctx = NoContext(), opt = false) where {F <: Function, T <: Tuple}
+
+Emit typed (and optimized if `opt = true`) `CodeInfo` using the Mixtape pipeline.
+""", emit)
 
 macro load_abi()
     expr = quote

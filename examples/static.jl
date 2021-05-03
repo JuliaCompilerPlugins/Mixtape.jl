@@ -1,10 +1,11 @@
 module StaticExample
 
 using Mixtape
+import Mixtape: CompilationContext, transform, allow
 using CodeInfoTools
 using MacroTools
 
-@ctx (false, false, false) struct Mix end
+struct Mix <: CompilationContext end
 
 module Rosenbrock
 
@@ -13,16 +14,16 @@ fake() = rosenbrock(1, 1, 1, 1)
 
 end
 
-@time entry = Mixtape.jit(Rosenbrock.rosenbrock, 
-                                 Tuple{Float64, Int, Int, Int}; 
-                                 opt = true)
+entry = jit(Rosenbrock.rosenbrock, 
+                    Tuple{Float64, Int, Int, Int}; 
+                    opt = true)
 
 display(@time entry(3.1, 1, 1, 1))
 display(@time entry(3.1, 1, 1, 1))
 
-@time entry = Mixtape.jit(Rosenbrock.rosenbrock, 
-                                 Tuple{Int, Int, Int, Int}; 
-                                 opt = true)
+entry = Mixtape.jit(Rosenbrock.rosenbrock, 
+                    Tuple{Int, Int, Int, Int}; 
+                    opt = true)
 
 display(@time entry(3, 1, 1, 1))
 display(@time entry(3, 1, 1, 1))

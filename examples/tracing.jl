@@ -1,13 +1,15 @@
 module Tracing
 
 using Mixtape
+import Mixtape: CompilationContext, transform, postopt!, allow
 
 f(x::Number, y) = sin(x + 1) + (sin(3y) - 1);
 
-@ctx (false, false, false) struct MyMix end
+struct MyMix <: CompilationContext end
 allow(ctx::MyMix, m::Module) = m == Tracing
 
 using Core.Compiler: Const, is_pure_intrinsic_infer, intrinsic_nothrow, anymap, quoted
+
 function postopt!(::MyMix, ir)
     for i in 1 : length(ir.stmts)
         stmt = ir.stmts[i][:inst]
@@ -42,8 +44,8 @@ function postopt!(::MyMix, ir)
 end
 
 λ = x -> f(x, 3.0)
-entry = Mixtape.jit(MyMix(), λ, Tuple{Float64})
-display(Mixtape.@code_inferred MyMix() λ(Float64))
+entry = Mixtape.jit(λ, Tuple{Float64}; ctx = MyMix())
+display(emit(λ, Tuple{Float64}; ctx = MyMix(), opt = true))
 display(entry(5.0))
 
 end # module

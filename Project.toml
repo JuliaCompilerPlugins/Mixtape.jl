@@ -1,7 +1,7 @@
 name = "Mixtape"
 uuid = "17c23775-69b5-4366-8053-0c64bad4914c"
 authors = ["McCoy R. Becker <mccoybecker@gmail.com> and Valentin Churavy <v.churavy@gmail.com>"]
-version = "0.2.7"
+version = "0.2.8"
 
 [deps]
 CodeInfoTools = "bc773b8a-8374-437a-b9f2-0e9785855863"

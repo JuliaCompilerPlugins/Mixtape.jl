@@ -12,13 +12,12 @@ end
 end
 
 using Mixtape
-import Mixtape: CompilationContext, transform, allow, show_after_inference,
-                show_after_optimization, debug
+import Mixtape: CompilationContext, transform, allow
 using CodeInfoTools
 using MacroTools
 
 # 101: How2Mix
-@ctx (false, false, false) struct MyMix end
+struct MyMix <: CompilationContext end
 
 # A few little utility functions for working with Expr instances.
 swap(e) = e

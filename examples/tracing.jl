@@ -5,6 +5,14 @@ import Mixtape: CompilationContext, transform, postopt!, allow
 
 f(x::Number, y) = sin(x + 1) + (sin(3y) - 1);
 
+foo(x) = x^5
+bar(x) = x^10
+
+function m(x, y)
+    g = x < 5 ? foo : bar
+    return g(y)
+end
+
 struct MyMix <: CompilationContext end
 allow(ctx::MyMix, m::Module) = m == Tracing
 
@@ -27,7 +35,6 @@ function postopt!(::MyMix, ir)
                 isa(f, Core.IntrinsicFunction) &&
                 is_pure_intrinsic_infer(f) &&
                 intrinsic_nothrow(f, atypes[2:end])
-
                 fargs = anymap(x::Const -> x.val, atypes[2:end])
                 val = f(fargs...)
                 Core.Compiler.setindex!(ir.stmts[i], quoted(val), :inst)
@@ -47,5 +54,7 @@ end
 entry = Mixtape.jit(λ, Tuple{Float64}; ctx = MyMix())
 display(emit(λ, Tuple{Float64}; ctx = MyMix(), opt = true))
 display(entry(5.0))
+λ = y -> m(5.0, y)
+display(emit(λ, Tuple{Float64}; ctx = MyMix(), opt = true))
 
 end # module

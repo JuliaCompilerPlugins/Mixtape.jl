@@ -546,9 +546,9 @@ identity(job::CompilerJob, src) = src
 const emit_compiled_cache = Dict{UInt, Any}()
 
 function emit(@nospecialize(f), tt::Type{T}; 
-        ctx = NoContext(), opt = false,
-        optlevel = Base.JLOptions().opt_level) where {F <: Function, T <: Tuple}
+        ctx = NoContext(), opt = false) where {F <: Function, T <: Tuple}
     fspec = FunctionSpec(f, tt, false, nothing) #=name=#
+    optlevel = Base.JLOptions().opt_level
     job = CompilerJob(MixtapeCompilerTarget(), 
                       fspec, 
                       MixtapeCompilerParams(;
@@ -561,14 +561,12 @@ end
 @doc(
 """
     emit(@nospecialize(f), tt::Type{T};
-        ctx = NoContext(), opt = false,
-        optlevel = Base.JLOptions().opt_level) where {F <: Function, T <: Tuple}
+        ctx = NoContext(), opt = false) where {F <: Function, T <: Tuple}
 
 Emit typed (and optimized if `opt = true`) `CodeInfo` using the Mixtape pipeline. The user can configure the pipeline with optional arguments:
 
 - `ctx::CompilationContext` -- configure [`transform`](@ref), [`preopt!`](@ref), [`postopt!`](@ref).
 - `opt::Bool` -- configure whether or not the Julia optimizer is run (including [`preopt!`](@ref) and [`postopt!`](@ref)).
-- `optlevel::Int > 0` -- configure the LLVM optimization level.
 """, emit)
 
 macro load_abi()

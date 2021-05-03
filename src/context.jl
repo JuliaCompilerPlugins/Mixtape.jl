@@ -23,7 +23,7 @@ transform(ctx::CompilationContext, b, sig) = transform(ctx, b)
     transform(ctx::CompilationContext, b::Core.CodeInfo)::Core.CodeInfo
     transform(ctx::CompilationContext, b::Core.CodeInfo, sig::Tuple)::Core.CodeInfo
 
-User-defined transform which operates on lowered `CodeInfo` in the form of a `CodeInfoTools.Builder` object. There's two versions: (1) ignores the signature of the current method body under consideration and (2) provides the signature as `sig`.
+User-defined transform which operates on lowered `Core.CodeInfo`. There's two versions: (1) ignores the signature of the current method body under consideration and (2) provides the signature as `sig`.
 
 Transforms might typically follow a simple "swap" format using `CodeInfoTools.Builder`:
 

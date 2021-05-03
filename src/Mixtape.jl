@@ -487,11 +487,18 @@ end
 
 @doc(
 """
-    jit(ctx::CompilationContext, f::F, tt::TT = Tuple{}) where {F, TT <: Type}
+    jit(f::F, tt::Type{T}; ctx = NoContext(),
+        opt = true,
+        optlevel = Base.JLOptions().opt_level) where {F, T <: Type}
 
-Compile and specialize a method instance for signature `Tuple{f, tt.parameters...}` with pipeline parametrized by `ctx`.
+Compile and specialize a method instance for signature `Tuple{f, tt.parameters...}` with pipeline parametrized by `ctx::CompilationContext`.
 
-Returns a callable "thunk" `Entry{F, RT, TT}` where `RT` is the return type of the instance after inference.
+Returns a callable instance of `Entry{F, RT, TT}` where `RT` is the return type of the instance after inference.
+
+The user can configure the pipeline with optional arguments:
+    1. `ctx::CompilationContext` -- configure [`transform`](@ref), [`preopt!`](@ref), [`postopt!`](@ref).
+    2. `opt::Bool` -- configure whether or not the Julia optimizer is run (including [`preopt!`](@ref) and [`postopt!`](@ref)).
+    3. `optlevel::Int > 0` -- configure the LLVM optimization level.
 """, jit)
 
 function _jitlink(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
@@ -553,9 +560,13 @@ end
 @doc(
 """
     emit(@nospecialize(f), tt::Type{T};
-        ctx = NoContext(), opt = false) where {F <: Function, T <: Tuple}
+        ctx = NoContext(), opt = false,
+        optlevel = Base.JLOptions().opt_level) where {F <: Function, T <: Tuple}
 
-Emit typed (and optimized if `opt = true`) `CodeInfo` using the Mixtape pipeline.
+Emit typed (and optimized if `opt = true`) `CodeInfo` using the Mixtape pipeline. The user can configure the pipeline with optional arguments:
+    1. `ctx::CompilationContext` -- configure [`transform`](@ref), [`preopt!`](@ref), [`postopt!`](@ref).
+    2. `opt::Bool` -- configure whether or not the Julia optimizer is run (including [`preopt!`](@ref) and [`postopt!`](@ref)).
+    3. `optlevel::Int > 0` -- configure the LLVM optimization level.
 """, emit)
 
 macro load_abi()

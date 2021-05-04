@@ -67,7 +67,7 @@ end
 """
     allow(f::CompilationContext, args...)::Bool
 
-Determines whether the user-defined [`transform`](@ref), [`preoptimize!`](@ref), and [`postoptimize!`](@ref) are allowed to look at a lowered `Core.CodeInfo` or `Core.Compiler.IRCode` instance.
+Determines whether the user-defined [`transform`](@ref) and [`optimize!`](@ref) are allowed to look at a lowered `Core.CodeInfo` or `Core.Compiler.IRCode` instance.
 
 The user is allowed to greenlight modules:
 

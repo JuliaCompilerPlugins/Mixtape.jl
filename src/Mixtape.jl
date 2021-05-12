@@ -150,17 +150,20 @@ end
 ##### Pre-inference
 #####
 
+function resolve_generic(a)
+    if a <: Function && isdefined(a, :instance)
+        return a.instance
+    else
+        return resolve(a)
+    end
+end
+
 function custom_pass!(interp::StaticInterpreter, result::InferenceResult, mi::Core.MethodInstance, src)
     src === nothing && return src
     mi.specTypes isa UnionAll && return src
     sig = Tuple(mi.specTypes.parameters)
-    if sig[1] <: Function && isdefined(sig[1], :instance)
-        fn = sig[1].instance
-    else
-        fn = sig[1]
-    end
-    as = map(resolve, sig[2 : end])
-    if allow(interp.ctx, mi.def.module, fn, as...)
+    as = map(resolve_generic, sig)
+    if allow(interp.ctx, mi.def.module, as...)
         src = transform(interp.ctx, src, sig)
     end
     return src

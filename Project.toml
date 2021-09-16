@@ -12,7 +12,7 @@ MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 
 [compat]
 CodeInfoTools = "0.3"
-GPUCompiler = "0.11, 0.12"
+GPUCompiler = "0.11, 0.12, 0.13"
 LLVM = "3.6, 4"
 LLVM_full_jll = "11.0"
 MacroTools = "0.5"

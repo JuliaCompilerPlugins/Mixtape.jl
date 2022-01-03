@@ -15,6 +15,7 @@ using CodeInfoTools: resolve
 using Core: MethodInstance, 
             CodeInstance,
             CodeInfo
+
 using Core.Compiler: WorldView,
                      NativeInterpreter,
                      InferenceResult,
@@ -32,7 +33,7 @@ using Core.Compiler: WorldView,
 
 using GPUCompiler: cached_compilation, 
                    FunctionSpec
-
+import GPUCompiler
 import GPUCompiler: AbstractCompilerTarget,
                     NativeCompilerTarget,
                     AbstractCompilerParams,
@@ -151,7 +152,7 @@ end
 #####
 
 function resolve_generic(a)
-    if a <: Function && isdefined(a, :instance)
+    if a isa Type && a <: Function && isdefined(a, :instance)
         return a.instance
     else
         return resolve(a)
@@ -439,6 +440,19 @@ function MixtapeCompilerParams(; opt = false,
     return MixtapeCompilerParams(opt, optlevel, ctx)
 end
 
+module Runtime
+    # the runtime library
+    signal_exception() = return
+    malloc(sz) = ccall("extern malloc", llvmcall, Csize_t, (Csize_t,), sz)
+    report_oom(sz) = return
+    report_exception(ex) = return
+    report_exception_name(ex) = return
+    report_exception_frame(idx, func, file, line) = return
+end
+
+GPUCompiler.runtime_module(::CompilerJob{<:Any, MixtapeCompilerParams}) = Runtime
+GPUCompiler.runtime_slug(job::CompilerJob{MixtapeCompilerTarget}) = "mixtape"
+
 function llvm_machine(::MixtapeCompilerTarget, 
         params::MixtapeCompilerParams)
     optlevel = get_llvm_optlevel(params.optlevel)
@@ -467,6 +481,30 @@ end
 end
 
 const jit_compiled_cache = Dict{UInt, Any}()
+
+include("JIT.jl")
+using .JIT
+
+function _jitlink(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
+    fspec = job.source
+    jitted_mod = JIT.add!(llvm_mod)
+    specfunc_addr = JIT.lookup(jitted_mod, specfunc_name)
+    specfunc_ptr = pointer(specfunc_addr)
+    func_addr = JIT.lookup(jitted_mod, func_name)
+    func_ptr = pointer(func_addr)
+    @assert(!(specfunc_ptr === C_NULL || func_ptr === C_NULL))
+    return Entry{typeof(fspec.f), rt, fspec.tt}(fspec.f, specfunc_ptr, func_ptr)
+end
+
+function _jit(job::CompilerJob)
+    rt, llvm_specfunc, llvm_func, llvm_mod = codegen(job)
+    specfunc_name = LLVM.name(llvm_specfunc)
+    func_name = LLVM.name(llvm_func)
+    JIT.annotate!(llvm_mod)
+    linkage!(llvm_func, LLVM.API.LLVMExternalLinkage)
+    linkage!(llvm_specfunc, LLVM.API.LLVMExternalLinkage)
+    return (rt, llvm_mod, func_name, specfunc_name)
+end
 
 function jit(@nospecialize(f), tt::Type{T}; 
         ctx = NoContext(), opt = true, 
@@ -498,31 +536,6 @@ The user can configure the pipeline with optional arguments:
 - `optlevel::Int > 0` -- configure the LLVM optimization level.
 """, jit)
 
-function _jitlink(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
-    fspec = job.source
-    tm = llvm_machine(job.target, job.params)
-    orc = LLVM.OrcJIT(tm)
-    atexit() do
-        return LLVM.dispose(orc)
-    end
-    optimize!(tm, llvm_mod)
-    jitted_mod = compile!(orc, llvm_mod)
-    specfunc_addr = addressin(orc, jitted_mod, specfunc_name)
-    specfunc_ptr = pointer(specfunc_addr)
-    func_addr = addressin(orc, jitted_mod, func_name)
-    func_ptr = pointer(func_addr)
-    @assert(!(specfunc_ptr === C_NULL || func_ptr === C_NULL))
-    return Entry{typeof(fspec.f), rt, fspec.tt}(fspec.f, specfunc_ptr, func_ptr)
-end
-
-function _jit(job::CompilerJob)
-    rt, llvm_specfunc, llvm_func, llvm_mod = codegen(job)
-    specfunc_name = LLVM.name(llvm_specfunc)
-    func_name = LLVM.name(llvm_func)
-    linkage!(llvm_func, LLVM.API.LLVMExternalLinkage)
-    linkage!(llvm_specfunc, LLVM.API.LLVMExternalLinkage)
-    return (rt, llvm_mod, func_name, specfunc_name)
-end
 
 #####
 ##### Emission and call interface

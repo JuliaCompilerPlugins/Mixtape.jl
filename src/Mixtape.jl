@@ -39,7 +39,6 @@ import GPUCompiler: AbstractCompilerTarget,
                     AbstractCompilerParams,
                     CompilerJob,
                     julia_datalayout,
-                    llvm_machine,
                     llvm_triple
 
 import Core.Compiler: InferenceState,
@@ -112,7 +111,7 @@ end
 
 # Holds its own cache.
 struct StaticInterpreter{I, C} <: AbstractInterpreter
-    code::Dict{MethodInstance, CodeInstance}
+    code::GPUCompiler.CodeCache
     inner::I
     messages::Vector{Tuple{MethodInstance, Int, String}}
     optimize::Bool
@@ -120,7 +119,7 @@ struct StaticInterpreter{I, C} <: AbstractInterpreter
 end
 
 function StaticInterpreter(; ctx = NoContext(), opt = false)
-    return StaticInterpreter(Dict{MethodInstance, CodeInstance}(),
+    return StaticInterpreter(GPUCompiler.GLOBAL_CI_CACHE,
                              NativeInterpreter(), 
                              Tuple{MethodInstance, Int, String}[],
                              opt,
@@ -133,7 +132,7 @@ get_world_counter(si::StaticInterpreter) = get_world_counter(si.inner)
 get_inference_cache(si::StaticInterpreter) = get_inference_cache(si.inner)
 lock_mi_inference(si::StaticInterpreter, mi::MethodInstance) = nothing
 unlock_mi_inference(si::StaticInterpreter, mi::MethodInstance) = nothing
-code_cache(si::StaticInterpreter) = si.code
+code_cache(si::StaticInterpreter) = WorldView(si.code, get_world_counter(si))
 Core.Compiler.get(a::Dict, b, c) = Base.get(a, b, c)
 Core.Compiler.get(a::WorldView{<:Dict}, b, c) = Base.get(a.cache,b,c)
 Core.Compiler.haskey(a::Dict, b) = Base.haskey(a, b)
@@ -282,7 +281,7 @@ end
 ##### LLVM optimization pipeline
 #####
 
-function optimize!(tm, mod::LLVM.Module)
+function optimize!(mod::LLVM.Module, tm)
     ModulePassManager() do pm
         add_library_info!(pm, triple(mod))
         add_transform_info!(pm, tm)
@@ -344,89 +343,9 @@ end
 ##### Entry codegen with cached compilation
 #####
 
-# Interpreter holds the cache.
-function cache_lookup(si::StaticInterpreter, mi::MethodInstance,
-        min_world, max_world)
-    Base.get(si.code, mi, nothing)
-end
-
-# Mostly from GPUCompiler. 
-# In future, try to upstream any requires changes.
-function codegen(job::CompilerJob)
-    f = job.source.f
-    tt = job.source.tt
-    opt = job.params.opt
-    si, ssg = analyze(f, tt; 
-                      ctx = job.params.ctx, opt = opt) # Populate local cache.
-    world = get_world_counter(si)
-    λ_lookup = (mi, min, max) -> cache_lookup(si, mi, min, max)
-    lookup_cb = @cfunction($λ_lookup, Any, (Any, UInt, UInt))
-    params = Base.CodegenParams(; 
-                                track_allocations = false, 
-                                code_coverage     = false,
-                                prefer_specsig    = true,
-                                gnu_pubnames      = false,
-                                lookup            = Base.unsafe_convert(Ptr{Nothing}, lookup_cb))
-
-    GC.@preserve lookup_cb begin
-        native_code = ccall(:jl_create_native, 
-                            Ptr{Cvoid},
-                            (Vector{MethodInstance}, 
-                             Base.CodegenParams, Cint), 
-                            [ssg.entry],
-                            params, 1) # = extern policy = #
-        @assert native_code != C_NULL
-        llvm_mod_ref = ccall(:jl_get_llvm_module, 
-                             LLVM.API.LLVMModuleRef, 
-                             (Ptr{Cvoid},),
-                             native_code)
-        @assert llvm_mod_ref != C_NULL
-        llvm_mod = LLVM.Module(llvm_mod_ref)
-    end
-    code = cache_lookup(si, ssg.entry, world, world)
-    llvm_func_idx = Ref{Int32}(-1)
-    llvm_specfunc_idx = Ref{Int32}(-1)
-    ccall(:jl_get_function_id, 
-          Nothing, 
-          (Ptr{Cvoid}, Any, Ptr{Int32}, Ptr{Int32}),
-          native_code, code, llvm_func_idx, llvm_specfunc_idx)
-    @assert llvm_specfunc_idx[] != -1
-    @assert llvm_func_idx[] != -1
-    llvm_func_ref = ccall(:jl_get_llvm_function, 
-                          LLVM.API.LLVMValueRef,
-                          (Ptr{Cvoid}, UInt32), 
-                          native_code, 
-                          llvm_func_idx[] - 1)
-    @assert llvm_func_ref != C_NULL
-    llvm_func = LLVM.Function(llvm_func_ref)
-    llvm_specfunc_ref = ccall(:jl_get_llvm_function, 
-                              LLVM.API.LLVMValueRef,
-                              (Ptr{Cvoid}, UInt32), 
-                              native_code, 
-                              llvm_specfunc_idx[] - 1)
-    @assert llvm_specfunc_ref != C_NULL
-    llvm_specfunc = LLVM.Function(llvm_specfunc_ref)
-    triple!(llvm_mod, llvm_triple(job.target))
-    if julia_datalayout(job.target) !== nothing
-        datalayout!(llvm_mod, julia_datalayout(job.target))
-    end
-    return (Any, llvm_specfunc, llvm_func, llvm_mod)
-end
-
 struct MixtapeCompilerTarget <: AbstractCompilerTarget end
 
 llvm_triple(::MixtapeCompilerTarget) = Sys.MACHINE
-
-function get_llvm_optlevel(opt_level::Int)
-    if opt_level < 2
-        optlevel = LLVM.API.LLVMCodeGenLevelNone
-    elseif opt_level == 2
-        optlevel = LLVM.API.LLVMCodeGenLevelDefault
-    else
-        optlevel = LLVM.API.LLVMCodeGenLevelAggressive
-    end
-    return optlevel
-end
 
 struct MixtapeCompilerParams <: AbstractCompilerParams
     opt::Bool
@@ -452,20 +371,11 @@ end
 
 GPUCompiler.runtime_module(::CompilerJob{<:Any, MixtapeCompilerParams}) = Runtime
 GPUCompiler.runtime_slug(job::CompilerJob{MixtapeCompilerTarget}) = "mixtape"
-
-function llvm_machine(::MixtapeCompilerTarget, 
-        params::MixtapeCompilerParams)
-    optlevel = get_llvm_optlevel(params.optlevel)
-    tm = LLVM.JITTargetMachine(; optlevel=optlevel)
-    LLVM.asm_verbosity!(tm, true)
-    return tm
-end
-
+GPUCompiler.get_interpreter(job::CompilerJob{MixtapeCompilerTarget}) = StaticInterpreter(; ctx = job.params.ctx, opt = job.params.opt)
 
 struct Entry{F, RT, TT}
     f::F
     specfunc::Ptr{Cvoid}
-    func::Ptr{Cvoid}
 end
 
 @generated function (entry::Entry{F, RT, TT})(args...) where {F, RT, TT}
@@ -485,25 +395,21 @@ const jit_compiled_cache = Dict{UInt, Any}()
 include("JIT.jl")
 using .JIT
 
-function _jitlink(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
+function _link(job::CompilerJob, (llvm_mod, specfunc_name))
     fspec = job.source
     jitted_mod = JIT.add!(llvm_mod)
     specfunc_addr = JIT.lookup(jitted_mod, specfunc_name)
     specfunc_ptr = pointer(specfunc_addr)
-    func_addr = JIT.lookup(jitted_mod, func_name)
-    func_ptr = pointer(func_addr)
-    @assert(!(specfunc_ptr === C_NULL || func_ptr === C_NULL))
-    return Entry{typeof(fspec.f), rt, fspec.tt}(fspec.f, specfunc_ptr, func_ptr)
+    rt = Core.Compiler.return_type(fspec.f, fspec.tt)
+    @assert(!(specfunc_ptr === C_NULL))
+    return Entry{typeof(fspec.f), rt, fspec.tt}(fspec.f, specfunc_ptr)
 end
 
-function _jit(job::CompilerJob)
-    rt, llvm_specfunc, llvm_func, llvm_mod = codegen(job)
-    specfunc_name = LLVM.name(llvm_specfunc)
-    func_name = LLVM.name(llvm_func)
-    JIT.annotate!(llvm_mod)
-    linkage!(llvm_func, LLVM.API.LLVMExternalLinkage)
-    linkage!(llvm_specfunc, LLVM.API.LLVMExternalLinkage)
-    return (rt, llvm_mod, func_name, specfunc_name)
+function _thunk(job::CompilerJob)
+    llvm_mod, meta = GPUCompiler.codegen(:llvm, job)
+    llvm_func = meta.entry
+    specfunc_name = LLVM.name(llvm_func)
+    return (llvm_mod, specfunc_name)
 end
 
 function jit(@nospecialize(f), tt::Type{T}; 
@@ -516,7 +422,7 @@ function jit(@nospecialize(f), tt::Type{T};
                                             opt = opt, 
                                             ctx = ctx,
                                             optlevel = optlevel))
-    return cached_compilation(jit_compiled_cache, job, _jit, _jitlink)
+    return cached_compilation(jit_compiled_cache, job, _thunk, _link)
 end
 
 @doc(
@@ -545,8 +451,7 @@ function _emit(job::CompilerJob)
     f = job.source.f
     tt = job.source.tt
     opt = job.params.opt
-    si, ssg = analyze(f, tt; 
-                      ctx = job.params.ctx, opt = opt) # Populate local cache.
+    si, ssg = analyze(f, tt; ctx = job.params.ctx, opt = opt)
     return get_codeinfo(ssg, entrypoint(ssg))
 end
 
@@ -589,7 +494,7 @@ macro load_abi()
             # Slow ABI. Requires an array allocation.
             expr = quote
                 vargs = Any[args...]
-                ccall($(entry.func), Any, (Any, Ptr{Any}, Int32), $(entry.f), vargs,
+                ccall($(entry.specfunc), Any, (Any, Ptr{Any}, Int32), $(entry.f), vargs,
                       $(length(args)))
             end
             return expr
@@ -618,7 +523,6 @@ end
     ...expands...
     call(f::T, args...; ctx = NoContext(), 
         optlevel = Base.JLOptions().opt_level) where T <: Function
-
 
 A macro which expands to define an ABI function `call` into the scope of the calling module. `call` wraps an `@generated` function which is called with signature argument types `Tuple{f <: Function, args...}`. The underlying `@generated` function creates a new instance of `ctx` (thus, a nullary constructor is an implicit requirement of your own subtypes of [`CompilationContext`](@ref) for usage with `call`) and calls [`jit`](@ref) -- it then caches a `ccall` which calls a function pointer to the [GPUCompiler](https://github.com/JuliaGPU/GPUCompiler.jl)-compiled LLVM module.
 

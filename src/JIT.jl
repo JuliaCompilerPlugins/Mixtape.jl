@@ -1,6 +1,6 @@
 module JIT
 
-# Roughly matches Enzyme's ORCv2 JIT.
+# Roughly matches Enzyme's ORC v2 JIT.
 
 using LLVM
 import LLVM:TargetMachine

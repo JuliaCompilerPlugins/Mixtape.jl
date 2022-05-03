@@ -12,11 +12,11 @@ MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 
 [compat]
 CodeInfoTools = "0.3"
-GPUCompiler = "0.11, 0.12"
-LLVM = "3.6, 4"
+GPUCompiler = "0.13"
+LLVM = "4.8"
 LLVM_full_jll = "11.0"
 MacroTools = "0.5"
-julia = "1.6"
+julia = "1.7"
 
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"

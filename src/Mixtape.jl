@@ -151,7 +151,7 @@ end
 #####
 
 function resolve_generic(a)
-    if a <: Function && isdefined(a, :instance)
+    if a isa Type && a <: Function && isdefined(a, :instance)
         return a.instance
     else
         return resolve(a)
@@ -501,15 +501,23 @@ The user can configure the pipeline with optional arguments:
 function _jitlink(job::CompilerJob, (rt, llvm_mod, func_name, specfunc_name))
     fspec = job.source
     tm = llvm_machine(job.target, job.params)
-    orc = LLVM.OrcJIT(tm)
+    orc = LLJIT(;tm)
+    jd = LLVM.JITDylib(orc)
     atexit() do
         return LLVM.dispose(orc)
     end
     optimize!(tm, llvm_mod)
-    jitted_mod = compile!(orc, llvm_mod)
-    specfunc_addr = addressin(orc, jitted_mod, specfunc_name)
+    obj = LLVM.emit(tm, llvm_mod, LLVM.API.LLVMObjectFile)
+
+    prefix = LLVM.get_prefix(orc)
+    dg = LLVM.CreateDynamicLibrarySearchGeneratorForProcess(prefix)
+    LLVM.add!(jd, dg)
+    
+    jitted_mod = add!(orc, jd, LLVM.MemoryBuffer(obj))#compile!(orc, llvm_mod)
+    
+    specfunc_addr = lookup(orc, specfunc_name)#addressin(orc, jitted_mod, specfunc_name)
     specfunc_ptr = pointer(specfunc_addr)
-    func_addr = addressin(orc, jitted_mod, func_name)
+    func_addr = lookup(orc, func_name)
     func_ptr = pointer(func_addr)
     @assert(!(specfunc_ptr === C_NULL || func_ptr === C_NULL))
     return Entry{typeof(fspec.f), rt, fspec.tt}(fspec.f, specfunc_ptr, func_ptr)
